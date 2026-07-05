@@ -104,7 +104,8 @@ def main(args=None):
         node.get_logger().info("사용자에 의해 노드가 안전하게 종료됩니다.")
     finally:
         node.destroy_node()
-        rclpy.shutdown()
+        if rclpy.ok():
+          rclpy.shutdown()
 
 
 if __name__ == '__main__':
