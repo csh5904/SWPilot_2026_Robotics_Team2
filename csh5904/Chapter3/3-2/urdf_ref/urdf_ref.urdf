@@ -1,0 +1,299 @@
+<?xml version="1.0"?>
+<!-- [시작] robot 태그로 로봇 이름을 정의하고, xacro(변수/매크로 기능)를 쓸 준비를 합니다. -->
+<robot name="macroed" xmlns:xacro="http://ros.org/wiki/xacro">
+
+  <!-- ========================================== -->
+  <!-- 1. 변수 정의 (Property) : 나중에 수정하기 편하게 치수를 미리 선언 -->
+  <!-- ========================================== -->
+  <xacro:property name="width" value="0.2" />       <!-- 로봇 몸통 반지름 / 머리 반지름 -->
+  <xacro:property name="leglen" value="0.6" />      <!-- 다리 길이 -->
+  <xacro:property name="polelen" value="0.2" />     <!-- 집게발 지지대(폴대) 길이 -->
+  <xacro:property name="bodylen" value="0.6" />     <!-- 몸통 원기둥의 높이 -->
+  <xacro:property name="baselen" value="0.4" />     <!-- 바퀴가 달리는 하부 베이스의 길이 -->
+  <xacro:property name="wheeldiam" value="0.07" />  <!-- 바퀴 지름 -->
+
+  <!-- ========================================== -->
+  <!-- 2. 색상 정의 (Material) : 로봇에 입힐 RGBA 색상 (0~1 사이 값) -->
+  <!-- ========================================== -->
+  <material name="blue">
+    <color rgba="0 0 0.8 1"/> <!-- 파란색 (R=0, G=0, B=0.8, A=투명도1) -->
+  </material>
+
+  <material name="black">
+    <color rgba="0 0 0 1"/>   <!-- 검은색 -->
+  </material>
+
+  <material name="white">
+    <color rgba="1 1 1 1"/>   <!-- 흰색 -->
+  </material>
+
+  <!-- ========================================== -->
+  <!-- 3. 매크로 정의 (Macro) : 반복되는 코드를 함수처럼 묶어두는 기능 -->
+  <!-- ========================================== -->
+  
+  <!-- [매크로 A] 무게 및 관성 정의 함수 (mass만 입력받음) -->
+  <xacro:macro name="default_inertial" params="mass">
+    <inertial>
+      <mass value="${mass}" /> <!-- 입력받은 무게 설정 -->
+      <!-- 관성 모멘트 회전 저항값 (시뮬레이션 가속도 계산용 기본값) -->
+      <inertia ixx="1e-3" ixy="0.0" ixz="0.0" iyy="1e-3" iyz="0.0" izz="1e-3" />
+    </inertial>
+  </xacro:macro>
+
+  <!-- [매크로 B] 바퀴 생성 함수 (앞/뒤, 좌/우 위치에 따라 자동 계산) -->
+  <!-- prefix: left/right, suffix: front/back, reflect: 1(앞) 또는 -1(뒤) -->
+  <xacro:macro name="wheel" params="prefix suffix reflect">
+
+    <!-- 바퀴 링크(뼈대) 생성 -->
+    <link name="${prefix}_${suffix}_wheel">
+      <visual>
+        <!-- rpy="롤 피치 요": 원기둥을눕히기 위해 Pitch 축으로 90도(pi/2) 회전 -->
+        <origin xyz="0 0 0" rpy="${pi/2} 0 0" />
+        <geometry>
+          <cylinder radius="${wheeldiam/2}" length="0.1"/> <!-- 반지름=지름/2, 두께=0.1 -->
+        </geometry>
+        <material name="black"/>
+      </visual>
+      <collision> <!-- 충돌 영역: visual과 동일하게 설정 -->
+        <origin xyz="0 0 0" rpy="${pi/2} 0 0" />
+        <geometry>
+          <cylinder radius="${wheeldiam/2}" length="0.1"/>
+        </geometry>
+      </collision>
+      <xacro:default_inertial mass="1"/> <!-- 1kg 무게 부여 -->
+    </link>
+
+    <!-- 바퀴 관절(관절) 생성: 무한 회전 관절(continuous) -->
+    <joint name="${prefix}_${suffix}_wheel_joint" type="continuous">
+      <axis xyz="0 1 0" rpy="0 0 0" /> <!-- 회전 중심축을 Y축(0 1 0)으로 설정 -->
+      <parent link="${prefix}_base"/>  <!-- 부모: 아래에서 만들 하부 베이스 -->
+      <child link="${prefix}_${suffix}_wheel"/> <!-- 자식: 방금 만든 바퀴 링크 -->
+      <!-- 부모 기준 바퀴 위치: reflect가 1이면 앞쪽, -1이면 뒤쪽에 배치됨 -->
+      <origin xyz="${baselen*reflect/3} 0 -${wheeldiam/2+.05}" rpy="0 0 0"/>
+    </joint>
+
+  </xacro:macro>
+
+  <!-- [매크로 C] 다리 세트 생성 함수 (다리 1개 + 하부베이스 1개 + 바퀴 2개 세트) -->
+  <!-- prefix: left/right, reflect: 1(왼쪽) 또는 -1(오른쪽) -->
+  <xacro:macro name="leg" params="prefix reflect">
+    
+    <!-- 1. 세로로 내려오는 다리 링크 -->
+    <link name="${prefix}_leg">
+      <visual>
+        <geometry>
+          <box size="${leglen} 0.1 0.2"/> <!-- 상자 형태 (가로, 세로, 높이) -->
+        </geometry>
+        <!-- 다리의 윗부분이 회전 중심이 되도록 원점을 아래로 반만큼(-leglen/2) 내리고 돌림 -->
+        <origin xyz="0 0 -${leglen/2}" rpy="0 ${pi/2} 0"/>
+        <material name="white"/>
+      </visual>
+      <collision>
+        <geometry>
+          <box size="${leglen} 0.1 0.2"/>
+        </geometry>
+        <origin xyz="0 0 -${leglen/2}" rpy="0 ${pi/2} 0"/>
+      </collision>
+      <xacro:default_inertial mass="10"/>
+    </link>
+
+    <!-- 다리를 몸통(base_link)에 붙이는 고정 관절(fixed) -->
+    <joint name="base_to_${prefix}_leg" type="fixed">
+      <parent link="base_link"/>
+      <child link="${prefix}_leg"/>
+      <!-- 몸통 중심에서 Y축 방향으로 좌(+), 우(-)로 벌려서 배치 -->
+      <origin xyz="0 ${reflect*(width+.02)} 0.25" />
+    </joint>
+
+    <!-- 2. 다리 밑에 가로로 달리는 하부 베이스 링크 (바퀴가 조립될 곳) -->
+    <link name="${prefix}_base">
+      <visual>
+        <geometry>
+          <box size="${baselen} 0.1 0.1"/>
+        </geometry>
+        <material name="white"/>
+      </visual>
+      <collision>
+        <geometry>
+          <box size="${baselen} 0.1 0.1"/>
+        </geometry>
+      </collision>
+      <xacro:default_inertial mass="10"/>
+    </link>
+
+    <!-- 하부 베이스를 다리 끝단(-leglen)에 고정하는 관절 -->
+    <joint name="${prefix}_base_joint" type="fixed">
+      <parent link="${prefix}_leg"/>
+      <child link="${prefix}_base"/>
+      <origin xyz="0 0 ${-leglen}" />
+    </joint>
+
+    <!-- [매크로 B 호출] 이 다리에 앞바퀴(front, reflect=1)와 뒷바퀴(back, reflect=-1)를 각각 부착 -->
+    <xacro:wheel prefix="${prefix}" suffix="front" reflect="1"/>
+    <xacro:wheel prefix="${prefix}" suffix="back" reflect="-1"/>
+  </xacro:macro>
+
+  <!-- [매크로 C 호출] 실제 로봇의 오른다리, 왼다리를 최종 생성 -->
+  <xacro:leg prefix="right" reflect="-1" />
+  <xacro:leg prefix="left" reflect="1" />
+
+
+  <!-- ========================================== -->
+  <!-- 4. 로봇 몸통 및 기본 부품들 정의 -->
+  <!-- ========================================== -->
+
+  <!-- [중요] 로봇의 가장 기본 중심이 되는 뼈대: 몸통 (base_link) -->
+  <link name="base_link">
+    <visual>
+      <geometry>
+        <cylinder radius="${width}" length="${bodylen}"/> <!-- 원기둥 몸통 -->
+      </geometry>
+      <material name="blue"/>
+    </visual>
+    <collision>
+      <geometry>
+        <cylinder radius="${width}" length="${bodylen}"/>
+      </geometry>
+    </collision>
+    <xacro:default_inertial mass="10"/>
+  </link>
+
+  <!-- 집게발을 앞으로 쭉 빼고 넣는 안테나 같은 직선 관절 (prismatic) -->
+  <joint name="gripper_extension" type="prismatic">
+    <parent link="base_link"/>
+    <child link="gripper_pole"/>
+    <!-- 축 방향으로 슬라이딩할 수 있는 한계치 설정 (최소 후퇴, 최대 전진, 최대 속도) -->
+    <limit effort="1000.0" lower="-${width*2-.02}" upper="0" velocity="0.5"/>
+    <axis xyz="1 0 0"/> <!-- X축(앞뒤) 방향으로 움직임 -->
+    <origin rpy="0 0 0" xyz="${width-.01} 0 0.2"/>
+  </joint>
+
+  <!-- 슬라이딩되어 나오는 집게 지지대 폴대 링크 -->
+  <link name="gripper_pole">
+    <visual>
+      <geometry>
+        <cylinder length="${polelen}" radius="0.01"/>
+      </geometry>
+      <origin xyz="${polelen/2} 0 0" rpy="0 ${pi/2} 0 "/> <!-- 원기둥을 앞으로 눕힘 -->
+    </visual>
+    <collision>
+      <geometry>
+        <cylinder length="${polelen}" radius="0.01"/>
+      </geometry>
+      <origin xyz="${polelen/2} 0 0" rpy="0 ${pi/2} 0 "/>
+    </collision>
+    <xacro:default_inertial mass="0.05"/>
+  </link>
+
+  <!-- [매크로 D] 집게 손가락(그리퍼) 생성 함수 -->
+  <xacro:macro name="gripper" params="prefix reflect">
+    <!-- 손가락 마디 회전 관절: 각도 제한이 있는 revolute 타입 -->
+    <joint name="${prefix}_gripper_joint" type="revolute">
+      <axis xyz="0 0 ${reflect}"/> <!-- Z축 기준으로 회전 -->
+      <limit effort="1000.0" lower="0.0" upper="0.548" velocity="0.5"/> <!-- 회전 각도 제한 -->
+      <origin rpy="0 0 0" xyz="${polelen} ${reflect*0.01} 0"/>
+      <parent link="gripper_pole"/>
+      <child link="${prefix}_gripper"/>
+    </joint>
+    
+    <!-- 손가락 링크 (외부 3D 메쉬 파일(.dae)을 불러와 외형 생성) -->
+    <link name="${prefix}_gripper">
+      <visual>
+        <origin rpy="${(reflect-1)/2*pi} 0 0" xyz="0 0 0"/>
+        <geometry>
+          <mesh filename="package://urdf_tutorial/meshes/l_finger.dae"/> <!-- 손가락 메쉬 -->
+        </geometry>
+      </visual>
+      <collision>
+        <geometry>
+          <mesh filename="package://urdf_tutorial/meshes/l_finger.dae"/>
+        </geometry>
+        <origin rpy="${(reflect-1)/2*pi} 0 0" xyz="0 0 0"/>
+      </collision>
+      <xacro:default_inertial mass="0.05"/>
+    </link>
+
+    <!-- 손가락 끝 마디(tip)를 붙이는 고정 관절 -->
+    <joint name="${prefix}_tip_joint" type="fixed">
+      <parent link="${prefix}_gripper"/>
+      <child link="${prefix}_tip"/>
+    </joint>
+    
+    <!-- 손가락 끝 마디 링크 (메쉬 파일 사용) -->
+    <link name="${prefix}_tip">
+      <visual>
+        <origin rpy="${(reflect-1)/2*pi} 0 0" xyz="0.09137 0.00495 0"/>
+        <geometry>
+          <mesh filename="package://urdf_tutorial/meshes/l_finger_tip.dae"/>
+        </geometry>
+      </visual>
+      <collision>
+        <geometry>
+          <mesh filename="package://urdf_tutorial/meshes/l_finger_tip.dae"/>
+        </geometry>
+        <origin rpy="${(reflect-1)/2*pi} 0 0" xyz="0.09137 0.00495 0"/>
+      </collision>
+      <xacro:default_inertial mass="0.05"/>
+    </link>
+  </xacro:macro>
+
+  <!-- [매크로 D 호출] 최종 왼쪽 집게발, 오른쪽 집게발 완성 -->
+  <xacro:gripper prefix="left" reflect="1" />
+  <xacro:gripper prefix="right" reflect="-1" />
+
+
+  <!-- ========================================== -->
+  <!-- 5. 로봇의 머리(Head) 및 센서 박스 정의 -->
+  <!-- ========================================== -->
+
+  <!-- 머리 링크 (구 형태) -->
+  <link name="head">
+    <visual>
+      <geometry>
+        <sphere radius="${width}"/> <!-- 반지름 0.2인 공 모양 -->
+      </geometry>
+      <material name="white"/>
+    </visual>
+    <collision>
+      <geometry>
+        <sphere radius="${width}"/>
+      </geometry>
+    </collision>
+    <xacro:default_inertial mass="2"/>
+  </link>
+
+  <!-- 머리가 도리도리 회전할 수 있게 해주는 무한 회전 관절(continuous) -->
+  <joint name="head_swivel" type="continuous">
+    <parent link="base_link"/>
+    <child link="head"/>
+    <axis xyz="0 0 1"/> <!-- Z축(세로축) 기준으로 회전 -->
+    <origin xyz="0 0 ${bodylen/2}"/> <!-- 몸통 맨 꼭대기에 배치 -->
+  </joint>
+
+  <!-- 머리 위에 달린 센서 상자(box) 링크 -->
+  <link name="box">
+    <visual>
+      <geometry>
+        <box size="0.08 0.08 0.08"/> <!-- 정육면체 상자 모양 -->
+      </geometry>
+      <material name="blue"/>
+      <origin xyz="-0.04 0 0"/>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.08 0.08 0.08"/>
+      </geometry>
+    </collision>
+    <xacro:default_inertial mass="1"/>
+  </link>
+
+  <!-- 상자를 머리(head)에 고정하는 관절 -->
+  <joint name="tobox" type="fixed">
+    <parent link="head"/>
+    <child link="box"/>
+    <!-- 수학 공식(0.707 * 반지름)을 써서 구체의 대각선 표면에 딱 붙도록 좌표 계산 -->
+    <origin xyz="${.707*width+0.04} 0 ${.707*width}"/>
+  </joint>
+
+</robot>
+<!-- [끝] 로봇 정의 종료 -->

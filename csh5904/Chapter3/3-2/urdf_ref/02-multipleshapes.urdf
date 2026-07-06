@@ -1,0 +1,29 @@
+<?xml version="1.0"?>
+<!-- 여러 개의 모양과 링크를 연결하는 예제 -->
+<robot name="multipleshapes">
+  <!-- base_link: 기초 링크 -->
+  <link name="base_link">
+    <visual>
+      <geometry>
+        <cylinder length="0.6" radius="0.2"/>
+      </geometry>
+    </visual>
+  </link>
+
+  <!-- right_leg: 두 번째 링크, base_link에 연결됨 -->
+  <link name="right_leg">
+    <visual>
+      <geometry>
+        <box size="0.6 0.1 0.2"/>
+      </geometry>
+    </visual>
+  </link>
+
+  <!-- joint: 부모 링크(parent)와 자식 링크(child)를 연결 -->
+  <!-- type="fixed": 상대 운동이 없음 -->
+  <joint name="base_to_right_leg" type="fixed">
+    <parent link="base_link"/>
+    <child link="right_leg"/>
+  </joint>
+
+</robot>

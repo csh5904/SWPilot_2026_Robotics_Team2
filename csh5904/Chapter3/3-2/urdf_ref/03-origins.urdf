@@ -1,0 +1,30 @@
+<?xml version="1.0"?>
+<!-- origin 예제: geometry와 joint 위치/자세를 지정 -->
+<robot name="origins">
+  <link name="base_link">
+    <visual>
+      <geometry>
+        <cylinder length="0.6" radius="0.2"/>
+      </geometry>
+    </visual>
+  </link>
+
+  <link name="right_leg">
+    <visual>
+      <geometry>
+        <box size="0.6 0.1 0.2"/>
+      </geometry>
+      <!-- origin: 이 링크의 시각 요소를 링크 좌표계에서 이동/회전 -->
+      <!-- rpy: roll, pitch, yaw (rad), xyz: x y z 위치 -->
+      <origin rpy="0 1.57075 0" xyz="0 0 -0.3"/>
+    </visual>
+  </link>
+
+  <joint name="base_to_right_leg" type="fixed">
+    <parent link="base_link"/>
+    <child link="right_leg"/>
+    <!-- joint origin: child 링크의 기준 위치를 부모 링크 기준으로 정의 -->
+    <origin xyz="0 -0.22 0.25"/>
+  </joint>
+
+</robot>

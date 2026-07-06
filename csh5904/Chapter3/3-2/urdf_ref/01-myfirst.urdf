@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<!-- URDF 기본 예제: 하나의 링크와 시각 요소만 포함 -->
+<robot name="myfirst">
+  <!-- link: 로봇의 한 개의 강체(rigid body)를 의미 -->
+  <link name="base_link">
+    <!-- visual: 시각적 렌더링을 위한 요소 -->
+    <visual>
+      <geometry>
+        <!-- cylinder: 실린더 형태의 기본 기하 요소 -->
+        <cylinder length="0.6" radius="0.2"/>
+      </geometry>
+    </visual>
+  </link>
+</robot>
