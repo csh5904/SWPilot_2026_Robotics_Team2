@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>1_linux</title>
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --secondary-color: #16a085;
+            --bg-color: #f8f9fa;
+            --text-color: #333333;
+            --border-color: #e2e8f0;
+            --code-bg: #edf2f7;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-size: 15px;
+            line-height: 1.7;
+            color: var(--text-color);
+            background-color: var(--bg-color);
+            margin: 0;
+            padding: 0;
+        }
+
+        .wrapper {
+            max-width: 900px;
+            margin: 40px auto;
+            padding: 40px;
+            background: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+        }
+
+        .file-name-tag {
+            display: inline-block;
+            background-color: #edf2f7;
+            color: var(--primary-color);
+            padding: 6px 14px;
+            border-radius: 6px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 1.1rem;
+            font-weight: bold;
+            margin-bottom: 25px;
+            border: 1px solid #cbd5e0;
+        }
+
+        h2 {
+            color: var(--secondary-color);
+            font-size: 1.4rem;
+            margin-top: 30px;
+            margin-bottom: 15px;
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 8px;
+        }
+
+        ul, ol {
+            padding-left: 25px;
+            margin-bottom: 20px;
+        }
+
+        li {
+            margin-bottom: 8px;
+            text-align: justify;
+        }
+
+        strong {
+            color: #2d3748;
+        }
+
+        code {
+            font-family: 'Courier New', Courier, monospace;
+            background-color: var(--code-bg);
+            padding: 2px 6px;
+            border-radius: 4px;
+            color: #c53030;
+            font-weight: bold;
+        }
+
+        pre {
+            background-color: #2d3748;
+            color: #f7fafc;
+            padding: 15px;
+            border-radius: 8px;
+            overflow-x: auto;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.9rem;
+            line-height: 1.5;
+            margin: 15px 0;
+        }
+        
+        .code-comment {
+            color: #718096;
+        }
+        
+        .code-keyword {
+            color: #f6ad55;
+        }
+    </style>
+</head>
+<body>
+
+<div class="wrapper">
+    <div class="file-name-tag">📄 1_linux.html</div>
+
+    <h2>1. 셸 환경이 실행되는 터미널 실행 방법</h2>
+    <ul>
+        <li><strong>개념:</strong> 터미널은 사용자가 글자를 입력해 리눅스 시스템과 소통하는 창(인터페이스)이며, 셸(Shell)은 사용자가 입력한 명령어를 해석하여 운영체제 커널에 전달하고 실행하는 프로그램입니다.</li>
+        <li><strong>실행 방법:</strong> 우분투 리눅스 환경에서 단축키 <code>Ctrl</code> + <code>Alt</code> + <code>T</code>를 누르면 즉시 터미널 창이 실행됩니다.</li>
+    </ul>
+
+    <h2>2. 홈 디렉토리의 개념</h2>
+    <ul>
+        <li><strong>개념:</strong> 리눅스 시스템에 로그인한 사용자(User)별로 주어지는 고유의 개인 저장 및 작업 공간입니다.</li>
+        <li><strong>특징:</strong> 경로 상에서 물결표(<code>~</code>) 기호로 축약하여 표현하며, 절대 경로로는 <code>/home/사용자계정이름</code>에 위치합니다. 시스템 핵심 영역을 건드리지 않고 사용자가 자유롭게 파일과 폴더를 제어할 수 있는 안전한 공간입니다.</li>
+    </ul>
+
+    <h2>3. 파일과 디렉토리를 관리하는데 필요한 명령어</h2>
+    <ul>
+        <li><code>pwd</code> (Print Working Directory): 현재 내가 위치해 있는 디렉토리의 전체 절대 경로를 화면에 출력합니다.</li>
+        <li><code>ls</code> (List): 현재 디렉토리 안에 있는 파일과 폴더 목록을 보여줍니다. <code>ls -al</code>을 사용하면 숨겨진 파일과 상세 권한까지 한눈에 볼 수 있습니다.</li>
+        <li><code>cd [경로]</code> (Change Directory): 지정한 경로의 폴더로 위치를 이동합니다. 인자 없이 <code>cd</code>나 <code>cd ~</code>만 입력하면 홈 디렉토리로 즉시 복귀합니다.</li>
+        <li><code>mkdir [폴더명]</code> (Make Directory): 현재 위치에 새로운 폴더(디렉토리)를 생성합니다.</li>
+        <li><code>rm [파일명]</code> (Remove): 지정한 파일을 삭제합니다. 폴더를 내부 내용까지 통째로 삭제하려면 <code>rm -rf [폴더명]</code> 구조를 사용합니다.</li>
+    </ul>
+
+    <h2>4. 파일의 내용을 확인하고 편집하는 방법</h2>
+    <ul>
+        <li><strong>파일 내용 확인 (cat):</strong> 터미널 창에서 <code>cat 파일명</code> 명령어를 입력하면 파일의 내부 텍스트 내용을 수정 없이 가볍게 출력해 볼 수 있습니다.</li>
+        <li><strong>파일 텍스트 편집 (nano):</strong> GUI(화면 인터페이스)가 없는 터미널 환경에서도 직관적으로 코드를 수정할 수 있는 내장 텍스트 편집기입니다.
+            <ul>
+                <li><code>nano 파일명</code>으로 편집 창에 진입합니다.</li>
+                <li>수정 완료 후 <code>Ctrl</code> + <code>O</code> (저장) &rarr; <code>Enter</code> (파일명 확인) &rarr; <code>Ctrl</code> + <code>X</code> (종료) 순서로 빠져나옵니다.</li>
+            </ul>
+        </li>
+    </ul>
+
+    <h2>5. 파일의 권한에 대한 개념과 파일의 권한을 바꾸는 방법</h2>
+    <ul>
+        <li><strong>권한 개념:</strong> 리눅스는 보안을 위해 모든 파일과 폴더에 <strong>읽기(r, 4), 쓰기(w, 2), 실행(x, 1)</strong> 권한을 부여하며, 이 권한을 <code>[소유자 / 그룹 / 기타 사용자]</code> 세 단계로 나누어 통제합니다.</li>
+        <li><strong>권한 변경 (chmod):</strong> 파일의 권한 설정을 바꿀 때는 <code>chmod</code> 명령어를 사용합니다.
+            <ul>
+                <li>특정 파일에 실행 권한을 추가할 때: <code>chmod +x 파일명</code></li>
+                <li>숫자 모드로 소유자에게 모든 권한(7), 그룹과 기타 사용자에게 읽기/실행 권한(5)을 줄 때: <code>chmod 755 파일명</code></li>
+            </ul>
+        </li>
+    </ul>
+
+    <h2>6. 실행파일, 셸 스크립트의 개념과 source 명령어 사용법</h2>
+    <ul>
+        <li><strong>실행파일:</strong> 시스템이 인지하여 직접 메모리에 올려 작업을 수행할 수 있도록 실행(x) 권한이 인가된 파일입니다.</li>
+        <li><strong>셸 스크립트:</strong> 리눅스 터미널에서 연속으로 실행할 명령어들을 하나의 텍스트 파일(확장자 <code>.sh</code>)에 순서대로 적어두고 순차 실행시키는 스크립트 파일입니다.</li>
+        <li><strong>source 명령어:</strong> 셸 스크립트를 실행할 때, 스크립트 내부에서 설정되거나 바뀐 환경 변수값들을 <strong>현재 열려 있는 터미널 창(세션)에 즉시 동기화하여 적용</strong>시키고자 할 때 사용합니다. (ROS2에서 패키지 환경 설정을 잡는 <code>source /opt/ros/.../setup.bash</code>가 대표적인 예시입니다.)</li>
+    </ul>
+
+    <h2>7. 사용자 권한, 슈퍼유저의 개념과 sudo 명령어</h2>
+    <ul>
+        <li><strong>사용자 권한 vs 슈퍼유저 (Root):</strong> 일반 사용자 계정은 보안상 자신의 홈 디렉토리 외에 시스템 핵심 설정을 바꿀 수 없습니다. 반면 슈퍼유저(Root)는 시스템의 모든 파일과 프로세스를 제어할 수 있는 전지전능한 최고 관리자 권한입니다.</li>
+        <li><strong>sudo (SuperUser Do) 명령어:</strong> 일반 사용자 계정에서 패키지 설치나 시스템 파일 수정 등 관리자 권한이 일시적으로 필요할 때 명령어 맨 앞에 붙이는 치트키입니다. 실행 시 본인 계정의 비밀번호 확인을 요구합니다.</li>
+    </ul>
+
+    <h2>8. 우분투 리눅스의 패키지 관리 방법과 apt 명령어</h2>
+    <ul>
+        <li><strong>패키지 관리 개념:</strong> 스마트폰의 앱스토어처럼, 프로그램의 설치·업데이트·삭제를 인터넷 저장소와 연동하여 자동으로 관리해 주는 시스템입니다.</li>
+        <li><strong>apt 명령어 사용 절차:</strong>
+            <ul>
+                <li><code>sudo apt update</code>: 원격 저장소의 최신 프로그램 리스트 및 버전 정보를 로컬에 동기화합니다. (프로그램 설치 전 필수 진행)</li>
+                <li><code>sudo apt install [패키지명]</code>: 동기화된 리스트를 바탕으로 원하는 소프트웨어를 시스템에 자동으로 다운로드하여 설치합니다.</li>
+            </ul>
+        </li>
+    </ul>
+
+    <h2>9. 파이썬 스크립트에서의 리눅스 권한 실습</h2>
+    <ul>
+        <li><strong>개념 및 연관성:</strong> 일반 사용자 권한으로 작동하는 스크립트가 루트 디렉토리 내부(예: <code>/test</code>)처럼 관리자 소유의 영역에 접근하여 디렉토리나 파일을 만들려고 하면 리눅스 보안 엔진에 의해 거부됩니다.</li>
+        <li><strong>코드 예시 (Python):</strong> 아래 파이썬 코드는 루트 경로 아래에 폴더와 파일을 생성하는 예제이며, 일반 사용자 권한으로 실행 시 <code>PermissionError</code> 예외를 발생시킵니다.</li>
+    </ul>
+    
+    <pre><span class="code-keyword">import</span> os
+
+target_dir = <span class="code-highlight">"/test"</span>
+file_path = os.path.join(<span class="code-highlight">"/test"</span>, <span class="code-highlight">"hello.txt"</span>)
+
+<span class="code-keyword">try</span>:
+    <span class="code-comment"># 루트 영역에 디렉토리가 없으면 생성을 시도</span>
+    <span class="code-keyword">if not</span> os.path.exists(target_dir):
+        os.makedirs(target_dir)
+        print(f<span class="code-highlight">" {target_dir} 디렉토리를 생성했습니다."</span>)
+
+    <span class="code-comment"># 디렉토리 내에 파일 기록 시도</span>
+    <span class="code-keyword">with</span> open(file_path, <span class="code-highlight">"w"</span>) <span class="code-keyword">as</span> f:
+        f.write(<span class="code-highlight">"Hello Linux"</span>)
+        
+    print(f<span class="code-highlight">" {file_path} 파일에 'Hello Linux'를 기록했습니다."</span>)
+
+<span class="code-keyword">except</span> <span class="code-highlight">PermissionError</span>:
+    <span class="code-comment"># 권한이 부족하여 생성이 거부된 경우 실행되는 예외 블록</span>
+    print(<span class="code-highlight">" 권한이 없습니다! 명령어 앞에 'sudo'를 붙여서 실행했는지 확인하세요."</span>)</pre>
+
+    <ul>
+        <li><strong>해결 방법:</strong> 이 스크립트가 오류 없이 정상 동작하도록 실행하려면 터미널에서 7번 항목에서 다룬 <code>sudo</code> 명령어를 붙여 최고 관리자 권한으로 실행해야 합니다.
+            <ul>
+                <li>실행 명령어 예시: <code>sudo python3 스크립트이름.py</code></li>
+            </ul>
+        </li>
+    </ul>
+</div>
+
+</body>
+</html>
