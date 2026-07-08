@@ -151,6 +151,3 @@ ros2 launch my_turtle_control turtlesim_swim.launch.py
 * Launch 파일이 실행되면 터미널 창 하나에 `turtlesim` 창이 뜨면서 내가 만든 제어 노드의 출력 로그가 통합되어 출력됩니다.
 * 종료할 때는 해당 터미널에서 **Ctrl+C**를 누르면 Launch 시스템이 실행했던 모든 노드를 순차적으로 안전하게 동시 종료(`Clean Shutdown`)시킵니다.
 
-```
-
-
