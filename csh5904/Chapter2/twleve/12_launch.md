@@ -1,8 +1,4 @@
-ROS 2의 **Launch File(런칭 파일)** 개념부터 파이썬을 이용한 작성법, `setup.py` 연동, 그리고 CLI 명령어까지 포함된 마크다운 복사용 템플릿입니다. 끊기지 않도록 내용 전부를 한 번에 채워 넣었습니다.
 
----
-
-```markdown
 # [ROS 2] Launch File 및 파이썬 기반 자동화 가이드
 
 ## 1. ROS 2 Launch File 개요
@@ -157,4 +153,4 @@ ros2 launch my_turtle_control turtlesim_swim.launch.py
 
 ```
 
-```
+
