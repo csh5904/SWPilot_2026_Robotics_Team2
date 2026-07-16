@@ -1,0 +1,199 @@
+<?xml version="1.0"?>
+<robot name="my_f" xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <xacro:property name="width" value="0.4" />       <xacro:property name="length" value="1.0" />      <xacro:property name="wheel_length" value="0.05" />
+  <xacro:property name="wheel_radius" value="0.15" /> <material name="blue"><color rgba="0 0 0.8 1"/></material>
+  <material name="white"><color rgba="1 1 1 1"/></material>
+  <material name="black"><color rgba="0 0 0 1"/></material>
+  <material name="red"><color rgba="0.8 0 0 1"/></material>
+
+  <xacro:macro name="cylinder_inertial" params="mass r l">
+    <inertial>
+      <mass value="${mass}"/>
+      <inertia ixx="${mass*(3*r*r + l*l)/12}" ixy="0" ixz="0"
+               iyy="${mass*(3*r*r + l*l)/12}" iyz="0"
+               izz="${mass*r*r/2}"/>
+    </inertial>
+  </xacro:macro>
+
+  <link name="base_footprint"/>
+  
+  <joint name="base_footprint_to_base_link_joint" type="fixed">
+    <parent link="base_footprint"/>
+    <child link="base_link"/>
+    <origin xyz="0 0 ${wheel_radius}" rpy="0 0 0"/>
+  </joint>
+  
+  <link name="base_link">
+    <visual>
+      <geometry>
+        <cylinder length="${length}" radius="${width}"/>
+      </geometry>
+      <origin xyz="0 0 0.05" rpy="0 1.570796 0"/>
+      <material name="white"/>
+    </visual>
+    <collision>
+      <geometry>
+        <cylinder length="${length}" radius="${width}"/>
+      </geometry>
+      <origin xyz="0 0 0.05" rpy="0 1.570796 0"/>
+    </collision>
+    <xacro:cylinder_inertial mass="10" r="${width}" l="${length}"/>
+  </link>
+
+  <xacro:macro name="drive_assembly" params="prefix reflect">
+    <link name="${prefix}_motor_link">
+      <visual>
+        <geometry>
+          <cylinder length="0.08" radius="0.05"/>
+        </geometry>
+        <origin xyz="0 0 0" rpy="1.570796 0 0"/>
+        <material name="blue"/>
+      </visual>
+      <collision>
+        <geometry>
+          <cylinder length="0.08" radius="0.05"/>
+        </geometry>
+        <origin xyz="0 0 0" rpy="1.570796 0 0"/>
+      </collision>
+      <xacro:cylinder_inertial mass="0.5" r="0.05" l="0.08"/>
+    </link>
+
+    <joint name="${prefix}_motor_joint" type="fixed">
+      <parent link="base_link"/>
+      <child link="${prefix}_motor_link"/>
+      <origin xyz="0 ${reflect * (width + 0.04)} 0" rpy="0 0 0"/>
+    </joint>
+
+    <joint name="${prefix}_wheel_joint" type="continuous">
+      <axis xyz="0 1 0"/>
+      <parent link="${prefix}_motor_link"/>
+      <child link="${prefix}_wheel"/>
+      <origin xyz="0 ${reflect * 0.04} 0" rpy="0 0 0"/>
+    </joint>
+
+    <link name="${prefix}_wheel">
+      <visual>
+        <geometry>
+          <cylinder length="${wheel_length}" radius="${wheel_radius}"/>
+        </geometry>
+        <origin xyz="0 0 0" rpy="1.570796 0 0"/>
+        <material name="black"/>
+      </visual>
+      <collision>
+        <geometry>
+          <cylinder length="${wheel_length}" radius="${wheel_radius}"/>
+        </geometry>
+        <origin xyz="0 0 0" rpy="1.570796 0 0"/>
+      </collision>
+      <xacro:cylinder_inertial mass="1" r="${wheel_radius}" l="${wheel_length}"/>
+    </link>
+  </xacro:macro>
+
+  <xacro:drive_assembly prefix="right" reflect="1"/>
+  <xacro:drive_assembly prefix="left" reflect="-1"/>
+
+  <link name="caster_wheel">
+    <visual>
+      <geometry>
+        <sphere radius="0.05"/>
+      </geometry>
+      <material name="black"/>
+    </visual>
+    <collision>
+      <geometry>
+        <sphere radius="0.05"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="0.5"/>
+      <inertia ixx="0.0005" ixy="0" ixz="0" iyy="0.0005" iyz="0" izz="0.0005"/>
+    </inertial>
+  </link>
+
+  <joint name="caster_wheel_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="caster_wheel"/>
+    <origin xyz="0.4 0 -0.1" rpy="0 0 0"/>
+  </joint>
+
+  <gazebo reference="caster_wheel">
+    <mu1>0.001</mu1>
+    <mu2>0.001</mu2>
+  </gazebo>
+
+  <xacro:macro name="ir_sensor" params="prefix xyz">
+    <link name="ir_${prefix}_link">
+      <visual>
+        <geometry>
+          <box size="0.02 0.02 0.02"/>
+        </geometry>
+        <material name="red"/>
+      </visual>
+      <xacro:cylinder_inertial mass="0.05" r="0.005" l="0.02"/>
+    </link>
+
+    <joint name="ir_${prefix}_joint" type="fixed">
+      <parent link="base_link"/>
+      <child link="ir_${prefix}_link"/>
+      <origin xyz="${xyz}" rpy="0 1.570796 0"/> </joint>
+
+    <gazebo reference="ir_${prefix}_link">
+      <sensor type="ray" name="ir_${prefix}_sensor">
+        <pose>0 0 0 0 0 0</pose>
+        <visualize>true</visualize>
+        <update_rate>50</update_rate>
+        <ray>
+          <scan>
+            <horizontal>
+              <samples>1</samples>
+              <resolution>1</resolution>
+              <min_angle>0</min_angle>
+              <max_angle>0</max_angle>
+            </horizontal>
+          </scan>
+          <range>
+            <min>0.005</min>
+            <max>0.15</max>
+            <resolution>0.001</resolution>
+          </range>
+        </ray>
+        <plugin name="ir_${prefix}_plugin" filename="libgazebo_ros_ray_sensor.so">
+          <ros>
+            <remapping>~/out:=/ir_sensor/${prefix}</remapping>
+          </ros>
+          <output_type>sensor_msgs/Range</output_type>
+          <frame_name>ir_${prefix}_link</frame_name>
+        </plugin>
+      </sensor>
+    </gazebo>
+  </xacro:macro>
+
+  <xacro:ir_sensor prefix="left"   xyz="0.48  0.06 -0.08"/>
+  <xacro:ir_sensor prefix="center" xyz="0.48  0.00 -0.08"/>
+  <xacro:ir_sensor prefix="right"  xyz="0.48 -0.06 -0.08"/>
+
+  <gazebo>
+    <plugin name="differential_drive_controller" filename="libgazebo_ros_diff_drive.so">
+      <update_rate>50</update_rate>
+      
+      <left_joint>left_wheel_joint</left_joint>
+      <right_joint>right_wheel_joint</right_joint>
+      
+      <wheel_separation>${(width + 0.08) * 2}</wheel_separation> 
+      <wheel_diameter>${wheel_radius * 2}</wheel_diameter>   
+      <max_wheel_torque>30</max_wheel_torque>
+      <max_wheel_acceleration>2.0</max_wheel_acceleration>
+      
+      <command_topic>cmd_vel</command_topic>
+      <odometry_topic>odom</odometry_topic>
+      <odometry_frame>odom</odometry_frame>
+      <robot_base_frame>base_footprint</robot_base_frame>
+      
+      <publish_odom>true</publish_odom>
+      <publish_odom_tf>true</publish_odom_tf>
+      <publish_wheel_tf>true</publish_wheel_tf>
+    </plugin>
+  </gazebo>
+  
+</robot>

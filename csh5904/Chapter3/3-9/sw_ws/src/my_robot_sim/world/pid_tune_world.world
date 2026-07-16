@@ -1,0 +1,330 @@
+<?xml version="1.0" ?>
+<sdf version="1.6">
+  <world name="complex_path_world">
+    <include>
+      <uri>model://sun</uri>
+    </include>
+    <include>
+      <uri>model://ground_plane</uri>
+    </include>
+
+    <!-- 폐곡선 경로 (둥근 사각형 트랙, 직선 4개 + 모서리 커브 4개) -->
+    <!-- 각 경로 조각은 collision + laser_retro=1000 을 가져 IR/레이저 센서가 검은 라인을 인식할 수 있음 -->
+    <model name="complex_path">
+      <static>true</static>
+      <link name="path_surface">
+
+        <!-- 배경 바닥 (시각용, laser_retro 없음 -> ground_plane 기본값 0 적용) -->
+        <visual name="background">
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>20 20</size>
+            </plane>
+          </geometry>
+          <material>
+            <ambient>0.7 0.7 0.7 1</ambient>
+            <diffuse>0.7 0.7 0.7 1</diffuse>
+          </material>
+        </visual>
+
+        <!-- 경로 1: 아래 직선 -->
+        <visual name="path_bottom_visual">
+          <geometry>
+            <box>
+              <size>5.600 0.300 0.0001</size>
+            </box>
+          </geometry>
+          <pose>2.000 0.000 0.0001 0 0 0.0000</pose>
+          <material>
+            <ambient>0 0 0 1</ambient>
+            <diffuse>0 0 0 1</diffuse>
+          </material>
+        </visual>
+        <collision name="path_bottom_collision">
+          <geometry>
+            <box>
+              <size>5.600 0.300 0.0001</size>
+            </box>
+          </geometry>
+          <pose>2.000 0.000 0.0001 0 0 0.0000</pose>
+          <laser_retro>1000.0</laser_retro>
+        </collision>
+
+        <!-- 경로 2: 우하단 커브 -->
+        <visual name="path_curve_br_visual">
+          <pose>0 0 0.0001 0 0 0</pose>
+          <geometry>
+            <polyline>
+              <point>4.800 -0.150</point>
+              <point>5.149 -0.104</point>
+              <point>5.475 0.031</point>
+              <point>5.755 0.245</point>
+              <point>5.969 0.525</point>
+              <point>6.104 0.851</point>
+              <point>6.150 1.200</point>
+              <point>5.850 1.200</point>
+              <point>5.814 0.928</point>
+              <point>5.709 0.675</point>
+              <point>5.542 0.458</point>
+              <point>5.325 0.291</point>
+              <point>5.072 0.186</point>
+              <point>4.800 0.150</point>
+              <height>0.0001</height>
+            </polyline>
+          </geometry>
+          <material>
+            <ambient>0 0 0 1</ambient>
+            <diffuse>0 0 0 1</diffuse>
+          </material>
+        </visual>
+        <collision name="path_curve_br_collision">
+          <pose>0 0 0.0001 0 0 0</pose>
+          <geometry>
+            <polyline>
+              <point>4.800 -0.150</point>
+              <point>5.149 -0.104</point>
+              <point>5.475 0.031</point>
+              <point>5.755 0.245</point>
+              <point>5.969 0.525</point>
+              <point>6.104 0.851</point>
+              <point>6.150 1.200</point>
+              <point>5.850 1.200</point>
+              <point>5.814 0.928</point>
+              <point>5.709 0.675</point>
+              <point>5.542 0.458</point>
+              <point>5.325 0.291</point>
+              <point>5.072 0.186</point>
+              <point>4.800 0.150</point>
+              <height>0.0001</height>
+            </polyline>
+          </geometry>
+          <laser_retro>1000.0</laser_retro>
+        </collision>
+
+        <!-- 경로 3: 오른쪽 직선 -->
+        <visual name="path_right_visual">
+          <geometry>
+            <box>
+              <size>2.600 0.300 0.0001</size>
+            </box>
+          </geometry>
+          <pose>6.000 2.500 0.0001 0 0 1.5708</pose>
+          <material>
+            <ambient>0 0 0 1</ambient>
+            <diffuse>0 0 0 1</diffuse>
+          </material>
+        </visual>
+        <collision name="path_right_collision">
+          <geometry>
+            <box>
+              <size>2.600 0.300 0.0001</size>
+            </box>
+          </geometry>
+          <pose>6.000 2.500 0.0001 0 0 1.5708</pose>
+          <laser_retro>1000.0</laser_retro>
+        </collision>
+
+        <!-- 경로 4: 우상단 커브 -->
+        <visual name="path_curve_tr_visual">
+          <pose>0 0 0.0001 0 0 0</pose>
+          <geometry>
+            <polyline>
+              <point>6.150 3.800</point>
+              <point>6.104 4.149</point>
+              <point>5.969 4.475</point>
+              <point>5.755 4.755</point>
+              <point>5.475 4.969</point>
+              <point>5.149 5.104</point>
+              <point>4.800 5.150</point>
+              <point>4.800 4.850</point>
+              <point>5.072 4.814</point>
+              <point>5.325 4.709</point>
+              <point>5.542 4.542</point>
+              <point>5.709 4.325</point>
+              <point>5.814 4.072</point>
+              <point>5.850 3.800</point>
+              <height>0.0001</height>
+            </polyline>
+          </geometry>
+          <material>
+            <ambient>0 0 0 1</ambient>
+            <diffuse>0 0 0 1</diffuse>
+          </material>
+        </visual>
+        <collision name="path_curve_tr_collision">
+          <pose>0 0 0.0001 0 0 0</pose>
+          <geometry>
+            <polyline>
+              <point>6.150 3.800</point>
+              <point>6.104 4.149</point>
+              <point>5.969 4.475</point>
+              <point>5.755 4.755</point>
+              <point>5.475 4.969</point>
+              <point>5.149 5.104</point>
+              <point>4.800 5.150</point>
+              <point>4.800 4.850</point>
+              <point>5.072 4.814</point>
+              <point>5.325 4.709</point>
+              <point>5.542 4.542</point>
+              <point>5.709 4.325</point>
+              <point>5.814 4.072</point>
+              <point>5.850 3.800</point>
+              <height>0.0001</height>
+            </polyline>
+          </geometry>
+          <laser_retro>1000.0</laser_retro>
+        </collision>
+
+        <!-- 경로 5: 위쪽 직선 -->
+        <visual name="path_top_visual">
+          <geometry>
+            <box>
+              <size>5.600 0.300 0.0001</size>
+            </box>
+          </geometry>
+          <pose>2.000 5.000 0.0001 0 0 3.1416</pose>
+          <material>
+            <ambient>0 0 0 1</ambient>
+            <diffuse>0 0 0 1</diffuse>
+          </material>
+        </visual>
+        <collision name="path_top_collision">
+          <geometry>
+            <box>
+              <size>5.600 0.300 0.0001</size>
+            </box>
+          </geometry>
+          <pose>2.000 5.000 0.0001 0 0 3.1416</pose>
+          <laser_retro>1000.0</laser_retro>
+        </collision>
+
+        <!-- 경로 6: 좌상단 커브 -->
+        <visual name="path_curve_tl_visual">
+          <pose>0 0 0.0001 0 0 0</pose>
+          <geometry>
+            <polyline>
+              <point>-0.800 5.150</point>
+              <point>-1.149 5.104</point>
+              <point>-1.475 4.969</point>
+              <point>-1.755 4.755</point>
+              <point>-1.969 4.475</point>
+              <point>-2.104 4.149</point>
+              <point>-2.150 3.800</point>
+              <point>-1.850 3.800</point>
+              <point>-1.814 4.072</point>
+              <point>-1.709 4.325</point>
+              <point>-1.542 4.542</point>
+              <point>-1.325 4.709</point>
+              <point>-1.072 4.814</point>
+              <point>-0.800 4.850</point>
+              <height>0.0001</height>
+            </polyline>
+          </geometry>
+          <material>
+            <ambient>0 0 0 1</ambient>
+            <diffuse>0 0 0 1</diffuse>
+          </material>
+        </visual>
+        <collision name="path_curve_tl_collision">
+          <pose>0 0 0.0001 0 0 0</pose>
+          <geometry>
+            <polyline>
+              <point>-0.800 5.150</point>
+              <point>-1.149 5.104</point>
+              <point>-1.475 4.969</point>
+              <point>-1.755 4.755</point>
+              <point>-1.969 4.475</point>
+              <point>-2.104 4.149</point>
+              <point>-2.150 3.800</point>
+              <point>-1.850 3.800</point>
+              <point>-1.814 4.072</point>
+              <point>-1.709 4.325</point>
+              <point>-1.542 4.542</point>
+              <point>-1.325 4.709</point>
+              <point>-1.072 4.814</point>
+              <point>-0.800 4.850</point>
+              <height>0.0001</height>
+            </polyline>
+          </geometry>
+          <laser_retro>1000.0</laser_retro>
+        </collision>
+
+        <!-- 경로 7: 왼쪽 직선 -->
+        <visual name="path_left_visual">
+          <geometry>
+            <box>
+              <size>2.600 0.300 0.0001</size>
+            </box>
+          </geometry>
+          <pose>-2.000 2.500 0.0001 0 0 -1.5708</pose>
+          <material>
+            <ambient>0 0 0 1</ambient>
+            <diffuse>0 0 0 1</diffuse>
+          </material>
+        </visual>
+        <collision name="path_left_collision">
+          <geometry>
+            <box>
+              <size>2.600 0.300 0.0001</size>
+            </box>
+          </geometry>
+          <pose>-2.000 2.500 0.0001 0 0 -1.5708</pose>
+          <laser_retro>1000.0</laser_retro>
+        </collision>
+
+        <!-- 경로 8: 좌하단 커브 -->
+        <visual name="path_curve_bl_visual">
+          <pose>0 0 0.0001 0 0 0</pose>
+          <geometry>
+            <polyline>
+              <point>-2.150 1.200</point>
+              <point>-2.104 0.851</point>
+              <point>-1.969 0.525</point>
+              <point>-1.755 0.245</point>
+              <point>-1.475 0.031</point>
+              <point>-1.149 -0.104</point>
+              <point>-0.800 -0.150</point>
+              <point>-0.800 0.150</point>
+              <point>-1.072 0.186</point>
+              <point>-1.325 0.291</point>
+              <point>-1.542 0.458</point>
+              <point>-1.709 0.675</point>
+              <point>-1.814 0.928</point>
+              <point>-1.850 1.200</point>
+              <height>0.0001</height>
+            </polyline>
+          </geometry>
+          <material>
+            <ambient>0 0 0 1</ambient>
+            <diffuse>0 0 0 1</diffuse>
+          </material>
+        </visual>
+        <collision name="path_curve_bl_collision">
+          <pose>0 0 0.0001 0 0 0</pose>
+          <geometry>
+            <polyline>
+              <point>-2.150 1.200</point>
+              <point>-2.104 0.851</point>
+              <point>-1.969 0.525</point>
+              <point>-1.755 0.245</point>
+              <point>-1.475 0.031</point>
+              <point>-1.149 -0.104</point>
+              <point>-0.800 -0.150</point>
+              <point>-0.800 0.150</point>
+              <point>-1.072 0.186</point>
+              <point>-1.325 0.291</point>
+              <point>-1.542 0.458</point>
+              <point>-1.709 0.675</point>
+              <point>-1.814 0.928</point>
+              <point>-1.850 1.200</point>
+              <height>0.0001</height>
+            </polyline>
+          </geometry>
+          <laser_retro>1000.0</laser_retro>
+        </collision>
+
+      </link>
+    </model>
+  </world>
+</sdf>

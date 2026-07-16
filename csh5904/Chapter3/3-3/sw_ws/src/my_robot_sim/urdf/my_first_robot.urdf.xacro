@@ -1,0 +1,75 @@
+<?xml version="1.0"?>
+<robot name="my_f" xmlns:xacro="http://www.ros.org/wiki/xacro">
+  <xacro:property name="width" value="0.4" />       <!-- 로봇 몸통 반지름 -->
+  <xacro:property name="length" value="1.0" />      <!-- 로봇 몸통 길이 -->
+  <xacro:property name="wheel_length" value="0.1" />      <!-- 로봇 몸통 높이 -->
+  <xacro:property name="body_high" value="0.1" />  <!-- 바퀴 지름 -->
+  <xacro:property name="wheelrad" value="${body_high+width}" />  <!-- 바퀴 지름 -->
+
+  <material name="blue">
+    <color rgba="0 0 0.8 1"/>
+  </material>
+
+  <material name="white">
+    <color rgba="1 1 1 1"/>
+  </material>
+  
+  <material name="black">
+    <color rgba="0 0 0 1"/>
+  </material>
+  <xacro:macro name="default_inertial" params="mass">
+    <inertial>
+      <mass value="${mass}" /> <!-- 입력받은 무게 설정 -->
+      <!-- 관성 모멘트 회전 저항값 (시뮬레이션 가속도 계산용 기본값) -->
+      <inertia ixx="1e-3" ixy="0.0" ixz="0.0" iyy="1e-3" iyz="0.0" izz="1e-3" />
+    </inertial>
+  </xacro:macro>
+  <xacro:macro name="wheel" params="prefix reflect">
+    <joint name="${prefix}_wheel_joint" type="continuous">
+      <axis xyz="0 0 ${reflect*1}"/> <!-- 회전 중심축을 Y축(0 1 0)으로 설정 -->
+      <parent link="base_link"/>  <!-- 부모: 아래에서 만들 하부 베이스 -->
+      <child link="${prefix}_wheel"/> <!-- 자식: 방금 만든 바퀴 링크 -->
+      <!-- 부모 기준 바퀴 위치: reflect가 1이면 앞쪽, -1이면 뒤쪽에 배치됨 -->
+      <origin xyz="0 ${reflect*(body_high+width)} 0" rpy="${reflect*1.570796} 0 0"/>
+    </joint>
+  </xacro:macro>
+
+  <link name="base_link">
+    <visual>
+      <geometry>
+        <cylinder length="${length}" radius="${width}"/>
+      </geometry>
+      <!-- [오타 수정] 순수 URDF는 글자 pi/2를 연산하지 못하므로 숫자로 변경 (pi/2 -> 1.570796) -->
+      <origin xyz="0 0 ${body_high}" rpy="0 1.570796 0"/>
+      <material name="white"/>
+    </visual>
+    <xacro:default_inertial mass="10"/>
+  </link>
+    
+  <link name="right_wheel">
+    <visual>
+      <geometry>
+        <cylinder length="${wheel_length}" radius="${wheelrad}"/>
+      </geometry>
+      <!-- [오타 수정] 글자 pi/2를 숫자로 변경 (pi/2 -> 1.570796) -->
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <material name="black"/>
+    </visual>
+    <xacro:default_inertial mass="1"/>
+  </link>
+
+  <link name="left_wheel">
+    <visual>
+      <geometry>
+        <cylinder length="${wheel_length}" radius="${wheelrad}"/>
+      </geometry>
+      <!-- [오타 수정] 글자 -pi/2를 숫자로 변경 (-pi/2 -> -1.570796) -->
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <material name="black"/>
+    </visual>
+    <xacro:default_inertial mass="1"/>
+  </link>
+
+  <xacro:wheel prefix="right" reflect="1"/>
+    <xacro:wheel prefix="left" reflect="-1"/>
+</robot>
