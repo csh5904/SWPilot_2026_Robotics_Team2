@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>3-10 실제 로봇으로 (URDF 완성)</title>
+<style>
+body{font-family:'Malgun Gothic',system-ui,sans-serif;line-height:1.75;color:#1f2933;max-width:900px;margin:0 auto;padding:32px 20px;background:#fff}
+h1{font-size:1.7rem;border-bottom:3px solid #2563eb;padding-bottom:10px}
+h2{font-size:1.3rem;margin-top:2em;color:#1e3a8a;border-left:5px solid #2563eb;padding-left:12px}
+h3{font-size:1.08rem;color:#374151;margin-top:1.5em}
+code{background:#f1f5f9;padding:2px 5px;border-radius:4px;font-family:Consolas,monospace;font-size:0.9em}
+pre{background:#0f172a;color:#e2e8f0;padding:16px;border-radius:8px;overflow-x:auto;font-size:0.85rem;line-height:1.5}
+pre code{background:none;color:inherit;padding:0}
+table{border-collapse:collapse;width:100%;margin:1em 0}
+th,td{border:1px solid #cbd5e1;padding:8px 10px;text-align:left}
+th{background:#eff6ff}
+.summary{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:14px 18px;margin:1em 0}
+.download{display:inline-block;background:#2563eb;color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none;margin:8px 0}
+img{max-width:100%;border:1px solid #e2e8f0;border-radius:8px;margin:6px 0}
+figure{margin:16px 0}
+figcaption{font-size:0.85rem;color:#64748b;text-align:center;margin-top:4px}
+.tag{display:inline-block;background:#dbeafe;color:#1e40af;font-size:0.8rem;padding:2px 10px;border-radius:20px}
+details{margin:1em 0;border:1px solid #e2e8f0;border-radius:8px;padding:8px 14px}
+summary{cursor:pointer;font-weight:bold;color:#1e3a8a}
+</style>
+</head>
+<body>
+
+<h1>3-10. 실제 로봇으로 — URDF 완성과 ROS2 추상화</h1>
+<p><span class="tag">Chapter 3 · 문제 10</span></p>
+
+<div class="summary">
+<strong>과제 목표</strong><br>
+로봇 모델에 아두이노 마이크로보드와 모터 드라이버에 해당하는 링크를 추가해 URDF를 완성한다. ROS2의 추상화 수준을 조사하고, 왜 마이크로보드·모터 드라이버를 저수준으로 직접 제어할 필요가 없는지, 시뮬레이션용 제어 프로그램을 실제 로봇에 그대로 쓰는 방법을 알아본다.
+</div>
+
+<h2>1. 마이크로보드·모터 드라이버 링크 추가</h2>
+<p>제어 보드(OpenCR 등 아두이노 계열 마이크로보드)와 모터 드라이버는 로봇 몸체에 실제로 붙어 있는 부품이다. 이들은 움직이는 관절이 아니므로, 외형·위치·연결 구조만 <code>fixed</code> 조인트로 반영한다. 아래 완성 URDF에서 보드는 받침대 위에 박스 형태로 배치했다(예: 1층 받침대 위 OpenCR 보드 <code>plate1_link</code> 내부 시각 요소).</p>
+
+<h2>2. ROS2의 추상화 수준</h2>
+<p>ROS2는 하드웨어의 세부 동작을 여러 계층으로 감싸서, 위 계층에서는 세부를 몰라도 되게 한다.</p>
+<table>
+<tr><th>계층</th><th>하는 일</th><th>예</th></tr>
+<tr><td>응용(제어 로직)</td><td>"어디로 얼마나 갈지" 명령</td><td>라인트레이싱 노드 → <code>/cmd_vel</code></td></tr>
+<tr><td>메시지·토픽</td><td>표준 인터페이스로 노드 간 통신</td><td><code>geometry_msgs/Twist</code></td></tr>
+<tr><td>드라이버·플러그인</td><td>명령을 실제 모터 신호로 변환</td><td>diff_drive, 하드웨어 인터페이스</td></tr>
+<tr><td>하드웨어</td><td>실제 모터·엔코더 구동</td><td>모터 드라이버, 아두이노</td></tr>
+</table>
+<p>URDF의 모든 링크마다 대응 노드를 반드시 만들 필요는 없다. 움직임·통신이 필요한 부분(바퀴, 센서)만 노드로 다루고, 단순 구조물(받침대, 기둥)은 시각·물리 정보만 두면 된다.</p>
+
+<h2>3. 왜 저수준 제어가 필요 없나</h2>
+<p>제어 노드는 <code>/cmd_vel</code>에 "선속도·각속도"만 보낸다. 이 명령이 실제로 각 모터를 몇 rpm으로 돌릴지, PWM 신호를 어떻게 줄지는 아래 계층(하드웨어 인터페이스, 모터 드라이버 펌웨어)이 알아서 한다.</p>
+<ul>
+<li>표준 메시지(<code>Twist</code>, <code>JointState</code>)와 하드웨어 추상화 계층이 세부 신호 처리를 대신한다.</li>
+<li>그래서 응용 개발자는 아두이노 핀·타이머·PWM 같은 저수준을 건드리지 않고 "무엇을 할지"에만 집중할 수 있다.</li>
+<li>모터나 드라이버가 바뀌어도, 그 부분의 드라이버만 교체하면 위쪽 제어 로직은 그대로 쓸 수 있다.</li>
+</ul>
+
+<h2>4. 시뮬레이션 → 실제 로봇 (Sim-to-Real)</h2>
+<p>Gazebo에서 쓰던 제어 프로그램을 실제 로봇에 거의 그대로 쓸 수 있는 건, 양쪽이 같은 토픽 인터페이스를 쓰기 때문이다.</p>
+<ul>
+<li><strong>시뮬레이션:</strong> 제어 노드 → <code>/cmd_vel</code> → Gazebo diff_drive 플러그인 → 가상 바퀴</li>
+<li><strong>실제 로봇:</strong> 제어 노드 → <code>/cmd_vel</code> → 하드웨어 인터페이스(마이크로보드 통신) → 진짜 모터</li>
+</ul>
+<p><code>/cmd_vel</code>을 구독하는 대상만 플러그인에서 실제 하드웨어 드라이버로 바꾸면, 제어 로직(라인트레이싱·PID)은 수정 없이 동작한다. 센서 쪽도 마찬가지로 <code>/scan</code>, <code>/joint_states</code> 같은 표준 토픽을 그대로 받는다.</p>
+
+<h2>5. 완성된 URDF (tracked_robot.urdf)</h2>
+<p>트랙형 이동 로봇의 완성 URDF다. 받침대 3층 구조에 OpenCR 보드·Jetson·배터리·라이다·카메라·IMU를 배치하고, 트랙 중앙에 숨김 구동륜 2개(차동 구동)와 캐스터 구 4개로 물리를 잡았다. Gazebo 플러그인(diff_drive, joint_state, IMU, LiDAR, Depth 카메라)까지 포함한다.</p>
+<details><summary>tracked_robot.urdf (펼쳐 보기)</summary>
+<pre><code>&lt;?xml version=&quot;1.0&quot; ?&gt;
+&lt;!--
+  트랙형 이동 로봇 URDF v5 (3차 실측 반영)
+  ==========================================================
+  확정 구조 (지면 기준):
+    - 1층 받침대 윗면 0.020 (두께 6.5mm)
+    - OpenCR 보드 0.055 (1층 윗면 +3.5cm), IMU는 보드 정중앙
+      IMU 축: x=전방(카메라), y=좌, z=상(라이다) - OpenCR/TB3 표준
+    - 2층 받침대 윗면 0.0945 (천장 -9cm +두께)
+    - 천장 받침대 윗면 0.178 (실측)
+    - 라이다 받침 윗면 0.224 (+4.6cm), 회전부 2.4cm → 꼭대기 0.248
+    - 카메라 중심 0.148 (실측 약 15cm, 0.314rad 전방 기울임)
+  트랙: 외곽 앞뒤 20cm(-0.10~+0.10), 안쪽 프로파일 17cm,
+    좌우 안쪽면 간격 12cm → 트랙 중심 y=±0.08, 전폭 20cm
+    → 주행 기하 wheel_separation 0.16으로 반영
+  트랙 전후: 앞끝이 1층 받침대 앞끝(0.105)에서 0.5cm 뒤(0.10),
+    뒤끝은 1층 뒤끝(-0.09)보다 뒤(-0.10)
+  2층 배치(뒤→앞): USB허브 - Jetson AGX Xavier - 보조배터리 밀착
+  카메라: D435 - depth/color/optical 프레임 정의 (내장 IMU 없음)
+  물리: 트랙 중앙 숨김 구동륜 2개(디퍼렌셜) + 캐스터 구 4개(마찰 0.1)
+--&gt;
+&lt;robot name=&quot;tracked_robot&quot;&gt;
+
+  &lt;material name=&quot;black&quot;&gt;&lt;color rgba=&quot;0.08 0.08 0.08 1.0&quot;/&gt;&lt;/material&gt;
+  &lt;material name=&quot;dark&quot;&gt;&lt;color rgba=&quot;0.2 0.2 0.2 1.0&quot;/&gt;&lt;/material&gt;
+  &lt;material name=&quot;silver&quot;&gt;&lt;color rgba=&quot;0.75 0.75 0.78 1.0&quot;/&gt;&lt;/material&gt;
+  &lt;material name=&quot;board_green&quot;&gt;&lt;color rgba=&quot;0.1 0.35 0.15 1.0&quot;/&gt;&lt;/material&gt;
+
+  &lt;!-- ================= BASE ================= --&gt;
+  &lt;link name=&quot;base_footprint&quot;/&gt;
+
+  &lt;joint name=&quot;base_joint&quot; type=&quot;fixed&quot;&gt;
+    &lt;parent link=&quot;base_footprint&quot;/&gt;
+    &lt;child link=&quot;base_link&quot;/&gt;
+    &lt;origin xyz=&quot;0 0 0.04&quot; rpy=&quot;0 0 0&quot;/&gt;
+  &lt;/joint&gt;
+
+  &lt;link name=&quot;base_link&quot;&gt;
+    &lt;!-- 다이나믹셀 XC430 x2 (뒷바퀴 구동, 시각 전용) --&gt;
+    &lt;visual&gt;
+      &lt;origin xyz=&quot;-0.048 0.047 0&quot;/&gt;
+      &lt;geometry&gt;&lt;box size=&quot;0.0465 0.0285 0.034&quot;/&gt;&lt;/geometry&gt;
+      &lt;material name=&quot;dark&quot;/&gt;
+    &lt;/visual&gt;
+    &lt;visual&gt;
+      &lt;origin xyz=&quot;-0.048 -0.047 0&quot;/&gt;
+      &lt;geometry&gt;&lt;box size=&quot;0.0465 0.0285 0.034&quot;/&gt;&lt;/geometry&gt;
+      &lt;material name=&quot;dark&quot;/&gt;
+    &lt;/visual&gt;
+    &lt;inertial&gt;
+      &lt;origin xyz=&quot;-0.03 0 0&quot; rpy=&quot;0 0 0&quot;/&gt;
+      &lt;mass value=&quot;0.30&quot;/&gt;
+      &lt;inertia ixx=&quot;3.1e-4&quot; ixy=&quot;0&quot; ixz=&quot;0&quot; iyy=&quot;9.6e-4&quot; iyz=&quot;0&quot; izz=&quot;1.15e-3&quot;/&gt;
+    &lt;/inertial&gt;
+  &lt;/link&gt;
+
+  &lt;!-- ================= 트랙 (시각 전용) ================= --&gt;
+  &lt;!-- 외곽 20cm, 안쪽 프로파일 17cm(끝 반경 2.5cm), 안쪽면 간격 12cm --&gt;
+  &lt;joint name=&quot;track_left_joint&quot; type=&quot;fixed&quot;&gt;
+    &lt;parent link=&quot;base_link&quot;/&gt;
+    &lt;child link=&quot;track_left_link&quot;/&gt;
+    &lt;origin xyz=&quot;0 0.08 0&quot; rpy=&quot;0 0 0&quot;/&gt;
+  &lt;/joint&gt;
+  &lt;link name=&quot;track_left_link&quot;&gt;
+    &lt;visual&gt;
+      &lt;geometry&gt;&lt;box size=&quot;0.12 0.04 0.08&quot;/&gt;&lt;/geometry&gt;
+      &lt;material name=&quot;black&quot;/&gt;
+    &lt;/visual&gt;
+    &lt;visual&gt;
+      &lt;origin xyz=&quot;0.06 0 0&quot; rpy=&quot;-1.570796 0 0&quot;/&gt;
+      &lt;geometry&gt;&lt;cylinder length=&quot;0.04&quot; radius=&quot;0.04&quot;/&gt;&lt;/geometry&gt;
+      &lt;material name=&quot;black&quot;/&gt;
+    &lt;/visual&gt;
+    &lt;visual&gt;
+      &lt;origin xyz=&quot;-0.06 0 0&quot; rpy=&quot;-1.570796 0 0&quot;/&gt;
+      &lt;geometry&gt;&lt;cylinder length=&quot;0.04&quot; radius=&quot;0.04&quot;/&gt;&lt;/geometry&gt;
+      &lt;material name=&quot;black&quot;/&gt;
+    &lt;/visual&gt;
+    &lt;visual&gt;&lt;!-- 앞 아이들러 허브 (안쪽 프로파일 반경 2.5cm) --&gt;
+      &lt;origin xyz=&quot;0.06 0 0&quot; rpy=&quot;-1.570796 0 0&quot;/&gt;
+      &lt;geometry&gt;&lt;cylinder length=&quot;0.042&quot; radius=&quot;0.025&quot;/&gt;&lt;/geometry&gt;
+      &lt;material name=&quot;dark&quot;/&gt;
+    &lt;/visual&gt;
+    &lt;visual&gt;&lt;!-- 뒤 구동 스프라켓 허브 --&gt;
+      &lt;origin xyz=&quot;-0.06 0 0&quot; rpy=&quot;-1.570796 0 0&quot;/&gt;
+      &lt;geometry&gt;&lt;cylinder length=&quot;0.042&quot; radius=&quot;0.025&quot;/&gt;&lt;/geometry&gt;
+      &lt;material name=&quot;dark&quot;/&gt;
+    &lt;/visual&gt;
+    &lt;collision&gt;
+      &lt;origin xyz=&quot;0 0 0.01&quot;/&gt;
+      &lt;geometry&gt;&lt;box size=&quot;0.20 0.04 0.06&quot;/&gt;&lt;/geometry&gt;
+    &lt;/collision&gt;
+    &lt;inertial&gt;
+      &lt;mass value=&quot;0.15&quot;/&gt;
+      &lt;inertia ixx=&quot;1.0e-4&quot; ixy=&quot;0&quot; ixz=&quot;0&quot; iyy=&quot;5.6e-4&quot; iyz=&quot;0&quot; izz=&quot;5.1e-4&quot;/&gt;
+    &lt;/inertial&gt;
+  &lt;/link&gt;
+
+  &lt;joint name=&quot;track_right_joint&quot; type=&quot;fixed&quot;&gt;
+    &lt;parent link=&quot;base_link&quot;/&gt;
+    &lt;child link=&quot;track_right_link&quot;/&gt;
+    &lt;origin xyz=&quot;0 -0.08 0&quot; rpy=&quot;0 0 0&quot;/&gt;
+  &lt;/joint&gt;
+  &lt;link name=&quot;track_right_link&quot;&gt;
+    &lt;visual&gt;
+      &lt;geometry&gt;&lt;box size=&quot;0.12 0.04 0.08&quot;/&gt;&lt;/geometry&gt;
+      &lt;material name=&quot;black&quot;/&gt;
+    &lt;/visual&gt;
+    &lt;visual&gt;
+      &lt;origin xyz=&quot;0.06 0 0&quot; rpy=&quot;-1.570796 0 0&quot;/&gt;
+      &lt;geometry&gt;&lt;cylinder length=&quot;0.04&quot; radius=&quot;0.04&quot;/&gt;&lt;/geometry&gt;
+      &lt;material name=&quot;black&quot;/&gt;
+    &lt;/visual&gt;
+    &lt;visual&gt;
+      &lt;origin xyz=&quot;-0.06 0 0&quot; rpy=&quot;-1.570796 0 0&quot;/&gt;
+      &lt;geometry&gt;&lt;cylinder length=&quot;0.04&quot; radius=&quot;0.04&quot;/&gt;&lt;/geometry&gt;
+      &lt;material name=&quot;black&quot;/&gt;
+    &lt;/visual&gt;
+    &lt;visual&gt;
+      &lt;origin xyz=&quot;0.06 0 0&quot; rpy=&quot;-1.570796 0 0&quot;/&gt;
+      &lt;geometry&gt;&lt;cylinder length=&quot;0.042&quot; radius=&quot;0.025&quot;/&gt;&lt;/geometry&gt;
+      &lt;material name=&quot;dark&quot;/&gt;
+    &lt;/visual&gt;
+    &lt;visual&gt;
+      &lt;origin xyz=&quot;-0.06 0 0&quot; rpy=&quot;-1.570796 0 0&quot;/&gt;
+      &lt;geometry&gt;&lt;cylinder length=&quot;0.042&quot; radius=&quot;0.025&quot;/&gt;&lt;/geometry&gt;
+      &lt;material name=&quot;dark&quot;/&gt;
+    &lt;/visual&gt;
+    &lt;collision&gt;
+      &lt;origin xyz=&quot;0 0 0.01&quot;/&gt;
+      &lt;geometry&gt;&lt;box size=&quot;0.20 0.04 0.06&quot;/&gt;&lt;/geometry&gt;
+    &lt;/collision&gt;
+    &lt;inertial&gt;
+      &lt;mass value=&quot;0.15&quot;/&gt;
+      &lt;inertia ixx=&quot;1.0e-4&quot; ixy=&quot;0&quot; ixz=&quot;0&quot; iyy=&quot;5.6e-4&quot; iyz=&quot;0&quot; izz=&quot;5.1e-4&quot;/&gt;
+    &lt;/inertial&gt;
+  &lt;/link&gt;
+
+  &lt;!-- ================= 구동륜 (숨김, 물리 전용, 트랙 중심선) ================= --&gt;
+  &lt;joint name=&quot;wheel_left_joint&quot; type=&quot;continuous&quot;&gt;
+    &lt;parent link=&quot;base_link&quot;/&gt;
+    &lt;child link=&quot;wheel_left_link&quot;/&gt;
+    &lt;origin xyz=&quot;0 0.08 0&quot; rpy=&quot;0 0 0&quot;/&gt;
+    &lt;axis xyz=&quot;0 1 0&quot;/&gt;
+  &lt;/joint&gt;
+  &lt;link name=&quot;wheel_left_link&quot;&gt;
+    &lt;collision&gt;
+      &lt;origin rpy=&quot;-1.570796 0 0&quot;/&gt;
+      &lt;geometry&gt;&lt;cylinder length=&quot;0.036&quot; radius=&quot;0.04&quot;/&gt;&lt;/geometry&gt;
+    &lt;/collision&gt;
+    &lt;inertial&gt;
+      &lt;mass value=&quot;0.10&quot;/&gt;
+      &lt;inertia ixx=&quot;5.1e-5&quot; ixy=&quot;0&quot; ixz=&quot;0&quot; iyy=&quot;5.1e-5&quot; iyz=&quot;0&quot; izz=&quot;8.0e-5&quot;/&gt;
+    &lt;/inertial&gt;
+  &lt;/link&gt;
+
+  &lt;joint name=&quot;wheel_right_joint&quot; type=&quot;continuous&quot;&gt;
+    &lt;parent link=&quot;base_link&quot;/&gt;
+    &lt;child link=&quot;wheel_right_link&quot;/&gt;
+    &lt;origin xyz=&quot;0 -0.08 0&quot; rpy=&quot;0 0 0&quot;/&gt;
+    &lt;axis xyz=&quot;0 1 0&quot;/&gt;
+  &lt;/joint&gt;
+  &lt;link name=&quot;wheel_right_link&quot;&gt;
+    &lt;collision&gt;
+      &lt;origin rpy=&quot;-1.570796 0 0&quot;/&gt;
+      &lt;geometry&gt;&lt;cylinder length=&quot;0.036&quot; radius=&quot;0.04&quot;/&gt;&lt;/geometry&gt;
+    &lt;/collision&gt;
+    &lt;inertial&gt;
+      &lt;mass value=&quot;0.10&quot;/&gt;
+      &lt;inertia ixx=&quot;5.1e-5&quot; ixy=&quot;0&quot; ixz=&quot;0&quot; iyy=&quot;5.1e-5&quot; iyz=&quot;0&quot; izz=&quot;8.0e-5&quot;/&gt;
+    &lt;/inertial&gt;
+  &lt;/link&gt;
+
+  &lt;!-- ================= 캐스터 구 4개 (트랙 끝 아래, 마찰 0.1) ================= --&gt;
+  &lt;joint name=&quot;caster_fl_joint&quot; type=&quot;fixed&quot;&gt;
+    &lt;parent link=&quot;base_link&quot;/&gt;&lt;child link=&quot;caster_fl_link&quot;/&gt;
+    &lt;origin xyz=&quot;0.088 0.08 -0.028&quot;/&gt;
+  &lt;/joint&gt;
+  &lt;link name=&quot;caster_fl_link&quot;&gt;
+    &lt;collision&gt;&lt;geometry&gt;&lt;sphere radius=&quot;0.012&quot;/&gt;&lt;/geometry&gt;&lt;/collision&gt;
+    &lt;inertial&gt;&lt;mass value=&quot;0.01&quot;/&gt;&lt;inertia ixx=&quot;1e-6&quot; ixy=&quot;0&quot; ixz=&quot;0&quot; iyy=&quot;1e-6&quot; iyz=&quot;0&quot; izz=&quot;1e-6&quot;/&gt;&lt;/inertial&gt;
+  &lt;/link&gt;
+
+  &lt;joint name=&quot;caster_fr_joint&quot; type=&quot;fixed&quot;&gt;
+    &lt;parent link=&quot;base_link&quot;/&gt;&lt;child link=&quot;caster_fr_link&quot;/&gt;
+    &lt;origin xyz=&quot;0.088 -0.08 -0.028&quot;/&gt;
+  &lt;/joint&gt;
+  &lt;link name=&quot;caster_fr_link&quot;&gt;
+    &lt;collision&gt;&lt;geometry&gt;&lt;sphere radius=&quot;0.012&quot;/&gt;&lt;/geometry&gt;&lt;/collision&gt;
+    &lt;inertial&gt;&lt;mass value=&quot;0.01&quot;/&gt;&lt;inertia ixx=&quot;1e-6&quot; ixy=&quot;0&quot; ixz=&quot;0&quot; iyy=&quot;1e-6&quot; iyz=&quot;0&quot; izz=&quot;1e-6&quot;/&gt;&lt;/inertial&gt;
+  &lt;/link&gt;
+
+  &lt;joint name=&quot;caster_rl_joint&quot; type=&quot;fixed&quot;&gt;
+    &lt;parent link=&quot;base_link&quot;/&gt;&lt;child link=&quot;caster_rl_link&quot;/&gt;
+    &lt;origin xyz=&quot;-0.088 0.08 -0.028&quot;/&gt;
+  &lt;/joint&gt;
+  &lt;link name=&quot;caster_rl_link&quot;&gt;
+    &lt;collision&gt;&lt;geometry&gt;&lt;sphere radius=&quot;0.012&quot;/&gt;&lt;/geometry&gt;&lt;/collision&gt;
+    &lt;inertial&gt;&lt;mass value=&quot;0.01&quot;/&gt;&lt;inertia ixx=&quot;1e-6&quot; ixy=&quot;0&quot; ixz=&quot;0&quot; iyy=&quot;1e-6&quot; iyz=&quot;0&quot; izz=&quot;1e-6&quot;/&gt;&lt;/inertial&gt;
+  &lt;/link&gt;
+
+  &lt;joint name=&quot;caster_rr_joint&quot; type=&quot;fixed&quot;&gt;
+    &lt;parent link=&quot;base_link&quot;/&gt;&lt;child link=&quot;caster_rr_link&quot;/&gt;
+    &lt;origin xyz=&quot;-0.088 -0.08 -0.028&quot;/&gt;
+  &lt;/joint&gt;
+  &lt;link name=&quot;caster_rr_link&quot;&gt;
+    &lt;collision&gt;&lt;geometry&gt;&lt;sphere radius=&quot;0.012&quot;/&gt;&lt;/geometry&gt;&lt;/collision&gt;
+    &lt;inertial&gt;&lt;mass value=&quot;0.01&quot;/&gt;&lt;inertia ixx=&quot;1e-6&quot; ixy=&quot;0&quot; ixz=&quot;0&quot; iyy=&quot;1e-6&quot; iyz=&quot;0&quot; izz=&quot;1e-6&quot;/&gt;&lt;/inertial&gt;
+  &lt;/link&gt;
+
+  &lt;!-- ================= 1층 받침대 (윗면 0.02, 두께 6.5mm) + OpenCR ================= --&gt;
+  &lt;!-- 앞끝 0.105 (트랙 앞끝 0.10 + 0.5cm), 중심 x 0.0075, 중심 z 0.0168 --&gt;
+  &lt;joint name=&quot;plate1_joint&quot; type=&quot;fixed&quot;&gt;
+    &lt;parent link=&quot;base_link&quot;/&gt;
+    &lt;child link=&quot;plate1_link&quot;/&gt;
+    &lt;origin xyz=&quot;0.0075 0 -0.0232&quot; rpy=&quot;0 0 0&quot;/&gt;
+  &lt;/joint&gt;
+  &lt;link name=&quot;plate1_link&quot;&gt;
+    &lt;visual&gt;
+      &lt;geometry&gt;&lt;box size=&quot;0.195 0.115 0.0065&quot;/&gt;&lt;/geometry&gt;
+      &lt;material name=&quot;black&quot;/&gt;
+    &lt;/visual&gt;
+    &lt;visual&gt;&lt;!-- OpenCR 10.2 x 7.4cm, 앞끝에서 2.5cm 뒤, 1층 윗면 +3.5cm --&gt;
+      &lt;origin xyz=&quot;0.0215 0 0.0382&quot;/&gt;
+      &lt;geometry&gt;&lt;box size=&quot;0.102 0.074 0.008&quot;/&gt;&lt;/geometry&gt;
+      &lt;material name=&quot;board_green&quot;/&gt;
+    &lt;/visual&gt;
+    &lt;collision&gt;&lt;geometry&gt;&lt;box size=&quot;0.195 0.115 0.0065&quot;/&gt;&lt;/geometry&gt;&lt;/collision&gt;
+    &lt;inertial&gt;
+      &lt;mass value=&quot;0.15&quot;/&gt;
+      &lt;inertia ixx=&quot;1.7e-4&quot; ixy=&quot;0&quot; ixz=&quot;0&quot; iyy=&quot;4.8e-4&quot; iyz=&quot;0&quot; izz=&quot;6.4e-4&quot;/&gt;
+    &lt;/inertial&gt;
+  &lt;/link&gt;
+
+  &lt;!-- ================= 2층 받침대 (윗면 0.0945) ================= --&gt;
+  &lt;!-- 뒤→앞: USB허브 - Jetson - 배터리 밀착, 앞끝에 볼마운트 --&gt;
+  &lt;joint name=&quot;plate2_joint&quot; type=&quot;fixed&quot;&gt;
+    &lt;parent link=&quot;base_link&quot;/&gt;
+    &lt;child link=&quot;plate2_link&quot;/&gt;
+    &lt;origin xyz=&quot;0.0075 0 0.0513&quot; rpy=&quot;0 0 0&quot;/&gt;
+  &lt;/joint&gt;
+  &lt;link name=&quot;plate2_link&quot;&gt;
+    &lt;visual&gt;
+      &lt;geometry&gt;&lt;box size=&quot;0.195 0.12 0.0065&quot;/&gt;&lt;/geometry&gt;
+      &lt;material name=&quot;black&quot;/&gt;
+    &lt;/visual&gt;
+    &lt;visual&gt;&lt;!-- USB 3.0 허브 (최후방, 17 x 2 x 5cm) --&gt;
+      &lt;origin xyz=&quot;-0.0875 0 0.0283&quot;/&gt;
+      &lt;geometry&gt;&lt;box size=&quot;0.02 0.17 0.05&quot;/&gt;&lt;/geometry&gt;
+      &lt;material name=&quot;black&quot;/&gt;
+    &lt;/visual&gt;
+    &lt;visual&gt;&lt;!-- Jetson AGX Xavier (허브에 밀착) --&gt;
+      &lt;origin xyz=&quot;-0.025 0 0.0358&quot;/&gt;
+      &lt;geometry&gt;&lt;box size=&quot;0.105 0.095 0.065&quot;/&gt;&lt;/geometry&gt;
+      &lt;material name=&quot;dark&quot;/&gt;
+    &lt;/visual&gt;
+    &lt;visual&gt;&lt;!-- 보조 배터리 (Jetson 앞에 밀착) --&gt;
+      &lt;origin xyz=&quot;0.0475 0 0.0256&quot;/&gt;
+      &lt;geometry&gt;&lt;box size=&quot;0.04 0.10 0.045&quot;/&gt;&lt;/geometry&gt;
+      &lt;material name=&quot;dark&quot;/&gt;
+    &lt;/visual&gt;
+    &lt;visual&gt;&lt;!-- 카메라 볼마운트: 앞끝에서 0.5cm 뒤, 지름 2.5cm, 높이 4cm --&gt;
+      &lt;origin xyz=&quot;0.08 0 0.0233&quot;/&gt;
+      &lt;geometry&gt;&lt;cylinder length=&quot;0.04&quot; radius=&quot;0.0125&quot;/&gt;&lt;/geometry&gt;
+      &lt;material name=&quot;silver&quot;/&gt;
+    &lt;/visual&gt;
+    &lt;visual&gt;&lt;!-- 1층→2층 기둥 --&gt;
+      &lt;origin xyz=&quot;0.09 0.05 -0.0373&quot;/&gt;&lt;geometry&gt;&lt;cylinder length=&quot;0.068&quot; radius=&quot;0.004&quot;/&gt;&lt;/geometry&gt;&lt;material name=&quot;silver&quot;/&gt;
+    &lt;/visual&gt;
+    &lt;visual&gt;
+      &lt;origin xyz=&quot;0.09 -0.05 -0.0373&quot;/&gt;&lt;geometry&gt;&lt;cylinder length=&quot;0.068&quot; radius=&quot;0.004&quot;/&gt;&lt;/geometry&gt;&lt;material name=&quot;silver&quot;/&gt;
+    &lt;/visual&gt;
+    &lt;visual&gt;
+      &lt;origin xyz=&quot;-0.09 0.05 -0.0373&quot;/&gt;&lt;geometry&gt;&lt;cylinder length=&quot;0.068&quot; radius=&quot;0.004&quot;/&gt;&lt;/geometry&gt;&lt;material name=&quot;silver&quot;/&gt;
+    &lt;/visual&gt;
+    &lt;visual&gt;
+      &lt;origin xyz=&quot;-0.09 -0.05 -0.0373&quot;/&gt;&lt;geometry&gt;&lt;cylinder length=&quot;0.068&quot; radius=&quot;0.004&quot;/&gt;&lt;/geometry&gt;&lt;material name=&quot;silver&quot;/&gt;
+    &lt;/visual&gt;
+    &lt;collision&gt;&lt;geometry&gt;&lt;box size=&quot;0.195 0.12 0.0065&quot;/&gt;&lt;/geometry&gt;&lt;/collision&gt;
+    &lt;inertial&gt;
+      &lt;origin xyz=&quot;-0.02 0 0.03&quot;/&gt;
+      &lt;mass value=&quot;1.34&quot;/&gt;
+      &lt;inertia ixx=&quot;2.3e-3&quot; ixy=&quot;0&quot; ixz=&quot;0&quot; iyy=&quot;4.9e-3&quot; iyz=&quot;0&quot; izz=&quot;5.9e-3&quot;/&gt;
+    &lt;/inertial&gt;
+  &lt;/link&gt;
+
+  &lt;!-- ================= 천장 받침대 (윗면 0.178) + 라이다 받침 ================= --&gt;
+  &lt;joint name=&quot;plate_top_joint&quot; type=&quot;fixed&quot;&gt;
+    &lt;parent link=&quot;base_link&quot;/&gt;
+    &lt;child link=&quot;plate_top_link&quot;/&gt;
+    &lt;origin xyz=&quot;0.0075 0 0.1348&quot; rpy=&quot;0 0 0&quot;/&gt;
+  &lt;/joint&gt;
+  &lt;link name=&quot;plate_top_link&quot;&gt;
+    &lt;visual&gt;
+      &lt;geometry&gt;&lt;box size=&quot;0.19 0.135 0.0065&quot;/&gt;&lt;/geometry&gt;
+      &lt;material name=&quot;black&quot;/&gt;
+    &lt;/visual&gt;
+    &lt;visual&gt;&lt;!-- 2층→천장 기둥 --&gt;
+      &lt;origin xyz=&quot;0.09 0.055 -0.0418&quot;/&gt;&lt;geometry&gt;&lt;cylinder length=&quot;0.077&quot; radius=&quot;0.004&quot;/&gt;&lt;/geometry&gt;&lt;material name=&quot;silver&quot;/&gt;
+    &lt;/visual&gt;
+    &lt;visual&gt;
+      &lt;origin xyz=&quot;0.09 -0.055 -0.0418&quot;/&gt;&lt;geometry&gt;&lt;cylinder length=&quot;0.077&quot; radius=&quot;0.004&quot;/&gt;&lt;/geometry&gt;&lt;material name=&quot;silver&quot;/&gt;
+    &lt;/visual&gt;
+    &lt;visual&gt;
+      &lt;origin xyz=&quot;-0.09 0.055 -0.0418&quot;/&gt;&lt;geometry&gt;&lt;cylinder length=&quot;0.077&quot; radius=&quot;0.004&quot;/&gt;&lt;/geometry&gt;&lt;material name=&quot;silver&quot;/&gt;
+    &lt;/visual&gt;
+    &lt;visual&gt;
+      &lt;origin xyz=&quot;-0.09 -0.055 -0.0418&quot;/&gt;&lt;geometry&gt;&lt;cylinder length=&quot;0.077&quot; radius=&quot;0.004&quot;/&gt;&lt;/geometry&gt;&lt;material name=&quot;silver&quot;/&gt;
+    &lt;/visual&gt;
+    &lt;visual&gt;&lt;!-- 라이다 받침 기둥 (천장 위 4.6cm) --&gt;
+      &lt;origin xyz=&quot;0.025 0.035 0.0243&quot;/&gt;&lt;geometry&gt;&lt;cylinder length=&quot;0.042&quot; radius=&quot;0.003&quot;/&gt;&lt;/geometry&gt;&lt;material name=&quot;dark&quot;/&gt;
+    &lt;/visual&gt;
+    &lt;visual&gt;
+      &lt;origin xyz=&quot;0.025 -0.035 0.0243&quot;/&gt;&lt;geometry&gt;&lt;cylinder length=&quot;0.042&quot; radius=&quot;0.003&quot;/&gt;&lt;/geometry&gt;&lt;material name=&quot;dark&quot;/&gt;
+    &lt;/visual&gt;
+    &lt;visual&gt;
+      &lt;origin xyz=&quot;-0.05 0 0.0243&quot;/&gt;&lt;geometry&gt;&lt;cylinder length=&quot;0.042&quot; radius=&quot;0.003&quot;/&gt;&lt;/geometry&gt;&lt;material name=&quot;dark&quot;/&gt;
+    &lt;/visual&gt;
+    &lt;visual&gt;&lt;!-- 라이다 받침 플레이트 (윗면 0.224) --&gt;
+      &lt;origin xyz=&quot;-0.0025 0 0.0473&quot;/&gt;
+      &lt;geometry&gt;&lt;box size=&quot;0.11 0.09 0.004&quot;/&gt;&lt;/geometry&gt;
+      &lt;material name=&quot;black&quot;/&gt;
+    &lt;/visual&gt;
+    &lt;visual&gt;&lt;!-- 라이다 벨트 구동 모터 (카메라 쪽 전방, 받침 밑) --&gt;
+      &lt;origin xyz=&quot;0.0525 0 0.030&quot;/&gt;
+      &lt;geometry&gt;&lt;cylinder length=&quot;0.03&quot; radius=&quot;0.012&quot;/&gt;&lt;/geometry&gt;
+      &lt;material name=&quot;silver&quot;/&gt;
+    &lt;/visual&gt;
+    &lt;collision&gt;&lt;geometry&gt;&lt;box size=&quot;0.19 0.135 0.0065&quot;/&gt;&lt;/geometry&gt;&lt;/collision&gt;
+    &lt;inertial&gt;
+      &lt;mass value=&quot;0.12&quot;/&gt;
+      &lt;inertia ixx=&quot;1.8e-4&quot; ixy=&quot;0&quot; ixz=&quot;0&quot; iyy=&quot;3.6e-4&quot; iyz=&quot;0&quot; izz=&quot;5.4e-4&quot;/&gt;
+    &lt;/inertial&gt;
+  &lt;/link&gt;
+
+  &lt;!-- ================= IMU (OpenCR 보드 정중앙) ================= --&gt;
+  &lt;!-- x=전방(카메라), y=좌, z=상(라이다) - OpenCR/TB3 표준 축 --&gt;
+  &lt;joint name=&quot;imu_joint&quot; type=&quot;fixed&quot;&gt;
+    &lt;parent link=&quot;base_link&quot;/&gt;
+    &lt;child link=&quot;imu_link&quot;/&gt;
+    &lt;origin xyz=&quot;0.029 0 0.015&quot; rpy=&quot;0 0 0&quot;/&gt;
+  &lt;/joint&gt;
+  &lt;link name=&quot;imu_link&quot;/&gt;
+
+  &lt;!-- ================= LiDAR (RPLIDAR A1M8) ================= --&gt;
+  &lt;!-- 받침 윗면 0.224, 회전부 2.4cm → 꼭대기 0.248. 스캔면 0.236 --&gt;
+  &lt;joint name=&quot;scan_joint&quot; type=&quot;fixed&quot;&gt;
+    &lt;parent link=&quot;base_link&quot;/&gt;
+    &lt;child link=&quot;base_scan&quot;/&gt;
+    &lt;origin xyz=&quot;0.005 0 0.196&quot; rpy=&quot;0 0 0&quot;/&gt;
+  &lt;/joint&gt;
+  &lt;link name=&quot;base_scan&quot;&gt;
+    &lt;visual&gt;
+      &lt;geometry&gt;&lt;cylinder length=&quot;0.024&quot; radius=&quot;0.035&quot;/&gt;&lt;/geometry&gt;
+      &lt;material name=&quot;dark&quot;/&gt;
+    &lt;/visual&gt;
+    &lt;collision&gt;
+      &lt;geometry&gt;&lt;cylinder length=&quot;0.024&quot; radius=&quot;0.035&quot;/&gt;&lt;/geometry&gt;
+    &lt;/collision&gt;
+    &lt;inertial&gt;
+      &lt;mass value=&quot;0.19&quot;/&gt;
+      &lt;inertia ixx=&quot;6.7e-5&quot; ixy=&quot;0&quot; ixz=&quot;0&quot; iyy=&quot;6.7e-5&quot; iyz=&quot;0&quot; izz=&quot;1.2e-4&quot;/&gt;
+    &lt;/inertial&gt;
+  &lt;/link&gt;
+
+  &lt;!-- ================= Camera: Intel RealSense D435 ================= --&gt;
+  &lt;!-- 중심 지면 0.148 (실측 ~15cm), 전방 0.314rad 기울임
+       프레임 구성 (realsense2 표준 근사):
+       camera_link(본체 중심) → camera_depth_frame(동일)
+         → camera_depth_optical_frame(광학 회전)
+       → camera_color_frame(y +1.5cm) → camera_color_optical_frame --&gt;
+  &lt;joint name=&quot;camera_joint&quot; type=&quot;fixed&quot;&gt;
+    &lt;parent link=&quot;base_link&quot;/&gt;
+    &lt;child link=&quot;camera_link&quot;/&gt;
+    &lt;origin xyz=&quot;0.0875 0 0.108&quot; rpy=&quot;0 0.314 0&quot;/&gt;
+  &lt;/joint&gt;
+  &lt;link name=&quot;camera_link&quot;&gt;
+    &lt;visual&gt;
+      &lt;geometry&gt;&lt;box size=&quot;0.025 0.09 0.025&quot;/&gt;&lt;/geometry&gt;
+      &lt;material name=&quot;silver&quot;/&gt;
+    &lt;/visual&gt;
+    &lt;visual&gt;&lt;!-- 전면 렌즈 바 --&gt;
+      &lt;origin xyz=&quot;0.0128 0 0&quot;/&gt;
+      &lt;geometry&gt;&lt;box size=&quot;0.002 0.078 0.016&quot;/&gt;&lt;/geometry&gt;
+      &lt;material name=&quot;black&quot;/&gt;
+    &lt;/visual&gt;
+    &lt;collision&gt;&lt;geometry&gt;&lt;box size=&quot;0.025 0.09 0.025&quot;/&gt;&lt;/geometry&gt;&lt;/collision&gt;
+    &lt;inertial&gt;
+      &lt;mass value=&quot;0.072&quot;/&gt;
+      &lt;inertia ixx=&quot;1.0e-6&quot; ixy=&quot;0&quot; ixz=&quot;0&quot; iyy=&quot;1.0e-6&quot; iyz=&quot;0&quot; izz=&quot;1.0e-6&quot;/&gt;
+    &lt;/inertial&gt;
+  &lt;/link&gt;
+
+  &lt;joint name=&quot;camera_depth_joint&quot; type=&quot;fixed&quot;&gt;
+    &lt;parent link=&quot;camera_link&quot;/&gt;
+    &lt;child link=&quot;camera_depth_frame&quot;/&gt;
+    &lt;origin xyz=&quot;0 0 0&quot; rpy=&quot;0 0 0&quot;/&gt;
+  &lt;/joint&gt;
+  &lt;link name=&quot;camera_depth_frame&quot;/&gt;
+
+  &lt;joint name=&quot;camera_depth_optical_joint&quot; type=&quot;fixed&quot;&gt;
+    &lt;parent link=&quot;camera_depth_frame&quot;/&gt;
+    &lt;child link=&quot;camera_depth_optical_frame&quot;/&gt;
+    &lt;origin xyz=&quot;0 0 0&quot; rpy=&quot;-1.570796 0 -1.570796&quot;/&gt;
+  &lt;/joint&gt;
+  &lt;link name=&quot;camera_depth_optical_frame&quot;/&gt;
+
+  &lt;joint name=&quot;camera_color_joint&quot; type=&quot;fixed&quot;&gt;
+    &lt;parent link=&quot;camera_link&quot;/&gt;
+    &lt;child link=&quot;camera_color_frame&quot;/&gt;
+    &lt;origin xyz=&quot;0 0.015 0&quot; rpy=&quot;0 0 0&quot;/&gt;
+  &lt;/joint&gt;
+  &lt;link name=&quot;camera_color_frame&quot;/&gt;
+
+  &lt;joint name=&quot;camera_color_optical_joint&quot; type=&quot;fixed&quot;&gt;
+    &lt;parent link=&quot;camera_color_frame&quot;/&gt;
+    &lt;child link=&quot;camera_color_optical_frame&quot;/&gt;
+    &lt;origin xyz=&quot;0 0 0&quot; rpy=&quot;-1.570796 0 -1.570796&quot;/&gt;
+  &lt;/joint&gt;
+  &lt;link name=&quot;camera_color_optical_frame&quot;/&gt;
+
+  &lt;!-- ================================================== --&gt;
+  &lt;!-- ================= GAZEBO 설정 ==================== --&gt;
+  &lt;!-- ================================================== --&gt;
+
+  &lt;gazebo reference=&quot;track_left_link&quot;&gt;&lt;material&gt;Gazebo/FlatBlack&lt;/material&gt;&lt;/gazebo&gt;
+  &lt;gazebo reference=&quot;track_right_link&quot;&gt;&lt;material&gt;Gazebo/FlatBlack&lt;/material&gt;&lt;/gazebo&gt;
+  &lt;gazebo reference=&quot;plate1_link&quot;&gt;&lt;material&gt;Gazebo/FlatBlack&lt;/material&gt;&lt;/gazebo&gt;
+  &lt;gazebo reference=&quot;plate2_link&quot;&gt;&lt;material&gt;Gazebo/FlatBlack&lt;/material&gt;&lt;/gazebo&gt;
+  &lt;gazebo reference=&quot;plate_top_link&quot;&gt;&lt;material&gt;Gazebo/FlatBlack&lt;/material&gt;&lt;/gazebo&gt;
+  &lt;gazebo reference=&quot;base_scan&quot;&gt;&lt;material&gt;Gazebo/DarkGrey&lt;/material&gt;&lt;/gazebo&gt;
+  &lt;gazebo reference=&quot;camera_link&quot;&gt;&lt;material&gt;Gazebo/Grey&lt;/material&gt;&lt;/gazebo&gt;
+
+  &lt;gazebo reference=&quot;wheel_left_link&quot;&gt;
+    &lt;mu1&gt;5.0&lt;/mu1&gt;&lt;mu2&gt;5.0&lt;/mu2&gt;
+    &lt;kp&gt;500000.0&lt;/kp&gt;&lt;kd&gt;10.0&lt;/kd&gt;
+    &lt;minDepth&gt;0.001&lt;/minDepth&gt;
+  &lt;/gazebo&gt;
+  &lt;gazebo reference=&quot;wheel_right_link&quot;&gt;
+    &lt;mu1&gt;5.0&lt;/mu1&gt;&lt;mu2&gt;5.0&lt;/mu2&gt;
+    &lt;kp&gt;500000.0&lt;/kp&gt;&lt;kd&gt;10.0&lt;/kd&gt;
+    &lt;minDepth&gt;0.001&lt;/minDepth&gt;
+  &lt;/gazebo&gt;
+
+  &lt;gazebo reference=&quot;caster_fl_link&quot;&gt;&lt;mu1&gt;0.1&lt;/mu1&gt;&lt;mu2&gt;0.1&lt;/mu2&gt;&lt;/gazebo&gt;
+  &lt;gazebo reference=&quot;caster_fr_link&quot;&gt;&lt;mu1&gt;0.1&lt;/mu1&gt;&lt;mu2&gt;0.1&lt;/mu2&gt;&lt;/gazebo&gt;
+  &lt;gazebo reference=&quot;caster_rl_link&quot;&gt;&lt;mu1&gt;0.1&lt;/mu1&gt;&lt;mu2&gt;0.1&lt;/mu2&gt;&lt;/gazebo&gt;
+  &lt;gazebo reference=&quot;caster_rr_link&quot;&gt;&lt;mu1&gt;0.1&lt;/mu1&gt;&lt;mu2&gt;0.1&lt;/mu2&gt;&lt;/gazebo&gt;
+
+  &lt;gazebo&gt;
+    &lt;plugin name=&quot;diff_drive&quot; filename=&quot;libgazebo_ros_diff_drive.so&quot;&gt;
+      &lt;update_rate&gt;50&lt;/update_rate&gt;
+      &lt;left_joint&gt;wheel_left_joint&lt;/left_joint&gt;
+      &lt;right_joint&gt;wheel_right_joint&lt;/right_joint&gt;
+      &lt;wheel_separation&gt;0.16&lt;/wheel_separation&gt;
+      &lt;wheel_diameter&gt;0.08&lt;/wheel_diameter&gt;
+      &lt;max_wheel_torque&gt;25&lt;/max_wheel_torque&gt;
+      &lt;max_wheel_acceleration&gt;10.0&lt;/max_wheel_acceleration&gt;
+      &lt;command_topic&gt;cmd_vel&lt;/command_topic&gt;
+      &lt;publish_odom&gt;true&lt;/publish_odom&gt;
+      &lt;publish_odom_tf&gt;true&lt;/publish_odom_tf&gt;
+      &lt;publish_wheel_tf&gt;false&lt;/publish_wheel_tf&gt;
+      &lt;odometry_topic&gt;odom&lt;/odometry_topic&gt;
+      &lt;odometry_frame&gt;odom&lt;/odometry_frame&gt;
+      &lt;robot_base_frame&gt;base_footprint&lt;/robot_base_frame&gt;
+    &lt;/plugin&gt;
+  &lt;/gazebo&gt;
+
+  &lt;gazebo&gt;
+    &lt;plugin name=&quot;joint_states&quot; filename=&quot;libgazebo_ros_joint_state_publisher.so&quot;&gt;
+      &lt;update_rate&gt;30&lt;/update_rate&gt;
+      &lt;joint_name&gt;wheel_left_joint&lt;/joint_name&gt;
+      &lt;joint_name&gt;wheel_right_joint&lt;/joint_name&gt;
+    &lt;/plugin&gt;
+  &lt;/gazebo&gt;
+
+  &lt;!-- OpenCR IMU --&gt;
+  &lt;gazebo reference=&quot;imu_link&quot;&gt;
+    &lt;sensor name=&quot;imu_sensor&quot; type=&quot;imu&quot;&gt;
+      &lt;always_on&gt;true&lt;/always_on&gt;
+      &lt;update_rate&gt;100&lt;/update_rate&gt;
+      &lt;plugin name=&quot;imu_plugin&quot; filename=&quot;libgazebo_ros_imu_sensor.so&quot;&gt;
+        &lt;ros&gt;&lt;remapping&gt;~/out:=imu&lt;/remapping&gt;&lt;/ros&gt;
+        &lt;frame_name&gt;imu_link&lt;/frame_name&gt;
+      &lt;/plugin&gt;
+    &lt;/sensor&gt;
+  &lt;/gazebo&gt;
+
+  &lt;!-- RPLIDAR A1M8 --&gt;
+  &lt;gazebo reference=&quot;base_scan&quot;&gt;
+    &lt;sensor name=&quot;lidar&quot; type=&quot;ray&quot;&gt;
+      &lt;always_on&gt;true&lt;/always_on&gt;
+      &lt;visualize&gt;false&lt;/visualize&gt;
+      &lt;update_rate&gt;10&lt;/update_rate&gt;
+      &lt;ray&gt;
+        &lt;scan&gt;
+          &lt;horizontal&gt;
+            &lt;samples&gt;360&lt;/samples&gt;
+            &lt;resolution&gt;1.0&lt;/resolution&gt;
+            &lt;min_angle&gt;-3.141592&lt;/min_angle&gt;
+            &lt;max_angle&gt;3.141592&lt;/max_angle&gt;
+          &lt;/horizontal&gt;
+        &lt;/scan&gt;
+        &lt;range&gt;
+          &lt;min&gt;0.15&lt;/min&gt;&lt;max&gt;12.0&lt;/max&gt;&lt;resolution&gt;0.01&lt;/resolution&gt;
+        &lt;/range&gt;
+        &lt;noise&gt;&lt;type&gt;gaussian&lt;/type&gt;&lt;mean&gt;0.0&lt;/mean&gt;&lt;stddev&gt;0.01&lt;/stddev&gt;&lt;/noise&gt;
+      &lt;/ray&gt;
+      &lt;plugin name=&quot;lidar_plugin&quot; filename=&quot;libgazebo_ros_ray_sensor.so&quot;&gt;
+        &lt;ros&gt;&lt;remapping&gt;~/out:=scan&lt;/remapping&gt;&lt;/ros&gt;
+        &lt;output_type&gt;sensor_msgs/LaserScan&lt;/output_type&gt;
+        &lt;frame_name&gt;base_scan&lt;/frame_name&gt;
+      &lt;/plugin&gt;
+    &lt;/sensor&gt;
+  &lt;/gazebo&gt;
+
+  &lt;!-- D435 뎁스 카메라 (depth FOV 87도) --&gt;
+  &lt;gazebo reference=&quot;camera_link&quot;&gt;
+    &lt;sensor name=&quot;depth_camera&quot; type=&quot;depth&quot;&gt;
+      &lt;always_on&gt;true&lt;/always_on&gt;
+      &lt;update_rate&gt;15&lt;/update_rate&gt;
+      &lt;camera&gt;
+        &lt;horizontal_fov&gt;1.5184&lt;/horizontal_fov&gt;
+        &lt;image&gt;&lt;width&gt;640&lt;/width&gt;&lt;height&gt;480&lt;/height&gt;&lt;format&gt;R8G8B8&lt;/format&gt;&lt;/image&gt;
+        &lt;clip&gt;&lt;near&gt;0.105&lt;/near&gt;&lt;far&gt;10.0&lt;/far&gt;&lt;/clip&gt;
+      &lt;/camera&gt;
+      &lt;plugin name=&quot;camera_plugin&quot; filename=&quot;libgazebo_ros_camera.so&quot;&gt;
+        &lt;camera_name&gt;camera&lt;/camera_name&gt;
+        &lt;frame_name&gt;camera_depth_optical_frame&lt;/frame_name&gt;
+        &lt;min_depth&gt;0.105&lt;/min_depth&gt;
+        &lt;max_depth&gt;10.0&lt;/max_depth&gt;
+      &lt;/plugin&gt;
+    &lt;/sensor&gt;
+  &lt;/gazebo&gt;
+
+&lt;/robot&gt;
+</code></pre>
+</details>
+
+<h2>6. 실행 결과 화면</h2>
+<figure><img src="data:image/png;base64,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" alt="아두이노 마이크로보드·모터 드라이버까지 반영한 완성 로봇 모델">
+<figcaption>아두이노 마이크로보드·모터 드라이버까지 반영한 완성 로봇 모델</figcaption></figure>
+
+<h2>7. 워크스페이스 (압축본)</h2>
+<a class="download" href="https://github.com/csh5904/SWPilot_2026_Robotics_Team2/raw/main/csh5904/Chapter3/3-10/sw_ws.tar.gz">sw_ws.tar.gz 다운로드</a>
+
+</body>
+</html>

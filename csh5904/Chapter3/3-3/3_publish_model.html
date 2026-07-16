@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>3-3 로봇 상태 퍼블리셔</title>
+<style>
+body{font-family:'Malgun Gothic',system-ui,sans-serif;line-height:1.75;color:#1f2933;max-width:900px;margin:0 auto;padding:32px 20px;background:#fff}
+h1{font-size:1.7rem;border-bottom:3px solid #2563eb;padding-bottom:10px}
+h2{font-size:1.3rem;margin-top:2em;color:#1e3a8a;border-left:5px solid #2563eb;padding-left:12px}
+h3{font-size:1.08rem;color:#374151;margin-top:1.5em}
+code{background:#f1f5f9;padding:2px 5px;border-radius:4px;font-family:Consolas,monospace;font-size:0.9em}
+pre{background:#0f172a;color:#e2e8f0;padding:16px;border-radius:8px;overflow-x:auto;font-size:0.85rem;line-height:1.5}
+pre code{background:none;color:inherit;padding:0}
+table{border-collapse:collapse;width:100%;margin:1em 0}
+th,td{border:1px solid #cbd5e1;padding:8px 10px;text-align:left}
+th{background:#eff6ff}
+.summary{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:14px 18px;margin:1em 0}
+.download{display:inline-block;background:#2563eb;color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none;margin:8px 0}
+img{max-width:100%;border:1px solid #e2e8f0;border-radius:8px;margin:6px 0}
+figure{margin:16px 0}
+figcaption{font-size:0.85rem;color:#64748b;text-align:center;margin-top:4px}
+.tag{display:inline-block;background:#dbeafe;color:#1e40af;font-size:0.8rem;padding:2px 10px;border-radius:20px}
+details{margin:1em 0;border:1px solid #e2e8f0;border-radius:8px;padding:8px 14px}
+summary{cursor:pointer;font-weight:bold;color:#1e3a8a}
+</style>
+</head>
+<body>
+
+<h1>3-3. 로봇 상태 퍼블리셔 구현</h1>
+<p><span class="tag">Chapter 3 · 문제 3</span></p>
+
+<div class="summary">
+<strong>과제 목표</strong><br>
+로봇 상태를 게시한다는 게 무슨 뜻인지, URDF 로봇 상태를 어떻게 게시하는지 조사한다. <code>/joint_states</code>에 관절 상태를 발행하는 노드를 파이썬으로 만들고, <code>robot_state_publisher</code>와 함께 실행해 RViz2에서 로봇을 확인한다.
+</div>
+
+<h2>1. 로봇 상태를 "게시"한다는 것</h2>
+<p>로봇의 링크들이 지금 3차원 공간에서 서로 어떤 위치와 자세(TF)로 놓여 있는지를 시스템 전체에 실시간으로 공유하는 것을 말한다.</p>
+<ul>
+<li><strong>구조 변화 전파:</strong> "바퀴가 회전했다", "팔 관절이 45도 꺾였다" 같은 동적 변화를 계속 업데이트한다.</li>
+<li><strong>좌표 변환:</strong> 상태를 게시해야 센서 측정값을 <code>base_link</code>나 <code>map</code>·<code>odom</code> 기준으로 올바르게 변환할 수 있다.</li>
+</ul>
+
+<h2>2. URDF 로봇 상태 게시 흐름</h2>
+<p>URDF 자체는 멈춰 있는 문서라서, 움직이는 상태를 게시하려면 다음 과정이 필요하다.</p>
+<ol>
+<li>Launch 파일로 URDF(또는 Xacro)를 읽어온다.</li>
+<li>읽어온 <code>robot_description</code>을 파라미터로 <code>robot_state_publisher</code> 노드를 실행한다.</li>
+<li>모터 엔코더나 시뮬레이터에서 각 관절의 현재 값을 받아온다.</li>
+<li><code>robot_state_publisher</code>가 구조 + 관절 값을 조합해 <code>/tf</code>를 계산·게시한다.</li>
+</ol>
+
+<h2>3. robot_state_publisher와 /joint_states의 관계</h2>
+<table>
+<tr><th>구성 요소</th><th>역할</th><th>입력</th><th>출력</th></tr>
+<tr><td><code>/joint_states</code></td><td>관절의 동적 상태값 전달</td><td>엔코더, 시뮬레이터</td><td>(데이터 메시지)</td></tr>
+<tr><td><code>robot_state_publisher</code></td><td>순기구학 계산 → 좌표 트리 생성</td><td>URDF + /joint_states</td><td><code>/tf</code>, <code>/tf_static</code></td></tr>
+</table>
+<p>정리하면 <code>/joint_states</code>는 "각 관절이 몇 rad/몇 m 움직였는가"라는 숫자만 담고, <code>robot_state_publisher</code>는 URDF 구조와 그 숫자를 조합해 순기구학을 풀어 <code>/tf</code>를 뿜어낸다.</p>
+
+<h2>4. joint_state_publisher.py</h2>
+<p><code>/joint_states</code> 토픽에 좌우 바퀴 관절 상태를 10Hz로 발행하는 노드다. TF 매칭을 위해 헤더 타임스탬프를 꼭 넣고, URDF에 적힌 관절 이름과 정확히 맞춘다.</p>
+<pre><code>import rclpy
+from rclpy.node import Node
+from sensor_msgs.msg import JointState
+import math
+
+class CustomJointStatePublisher(Node):
+    def __init__(self):
+        super().__init__(&#x27;custom_joint_state_publisher&#x27;)
+        
+        # 1. /joint_states 토픽을 발행할 Publisher 생성
+        self.joint_pub = self.create_publisher(JointState, &#x27;joint_states&#x27;, 10)
+        
+        # 2. 0.1초(10Hz)마다 토픽을 발행할 타이머 생성
+        self.timer = self.create_timer(0.1, self.timer_callback)
+        
+        # 관절 제어를 위한 임시 변수 (가상으로 움직임을 주기 위함)
+        self.pose = 0.0
+
+    def timer_callback(self):
+        # 3. JointState 메시지 객체 생성
+        msg = JointState()
+        
+        # 4. 현재 시간 타임스탬프 설정 (TF 매칭을 위해 필수!)
+        msg.header.stamp = self.get_clock().now().to_msg()
+        
+        # 5. URDF에 적힌 정확한 관절 이름 매칭
+        msg.name = [&#x27;right_wheel_joint&#x27;, &#x27;left_wheel_joint&#x27;]
+    
+        msg.position = [self.pose, self.pose]
+        # 7. 메시지 발행
+        self.joint_pub.publish(msg)
+        self.get_logger().info(f&#x27;Publishing Joint States: {msg.position}&#x27;)
+        
+
+
+def main(args=None):
+    rclpy.init(args=args)
+    node = CustomJointStatePublisher()
+    try:
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        node.destroy_node()
+        rclpy.shutdown()
+
+if __name__ == &#x27;__main__&#x27;:
+    main()</code></pre>
+
+<h2>5. Launch 파일 (state_publish.launch.py)</h2>
+<p>Xacro를 파싱해 <code>robot_state_publisher</code>에 주입하고, 직접 만든 <code>joint_state_publisher</code> 노드와 RViz2를 함께 띄운다.</p>
+<pre><code>import os
+from ament_index_python.packages import get_package_share_directory
+from launch import LaunchDescription
+from launch_ros.actions import Node
+import xacro
+
+def generate_launch_description():
+    pkg_share = get_package_share_directory(&#x27;my_robot_sim&#x27;)
+    xacro_file = os.path.join(pkg_share, &#x27;urdf&#x27;, &#x27;my_first_robot.urdf.xacro&#x27;)
+
+    # Xacro 파싱 및 XML 변환
+    robot_description_config = xacro.process_file(xacro_file)
+    robot_desc = robot_description_config.toxml()
+
+    return LaunchDescription([
+        # 1. URDF 설계도를 주입받아 기구학 변환(/tf)을 뿜어내는 노드
+        Node(
+            package=&#x27;robot_state_publisher&#x27;,
+            executable=&#x27;robot_state_publisher&#x27;,
+            name=&#x27;robot_state_publisher&#x27;,
+            output=&#x27;screen&#x27;,
+            parameters=[{&#x27;robot_description&#x27;: robot_desc}]
+        ),
+        
+        # 2. 질문자님이 작성한 /joint_states 발행 노드
+        Node(
+            package=&#x27;my_robot_sim&#x27;,
+            executable=&#x27;joint_state_publisher&#x27;,
+            name=&#x27;custom_joint_state_publisher&#x27;,
+            output=&#x27;screen&#x27;
+        ),
+        
+        # 3. [완벽 수정] 괄호나 콤마 없이 공백과 등호(=)로만 파싱하는 RViz2 인라인 주입 문법
+        Node(
+            package=&#x27;rviz2&#x27;,
+            executable=&#x27;rviz2&#x27;,
+            name=&#x27;rviz2&#x27;,
+            output=&#x27;screen&#x27;
+        )
+    ])</code></pre>
+
+<h2>6. RViz 설정 파일</h2>
+<p>RViz2에서 RobotModel·TF 표시를 맞춘 뒤 <code>rviz_config.rviz</code>로 저장해 두면, 다음 실행 때 같은 화면 구성으로 바로 열 수 있다.</p>
+
+<h2>7. 워크스페이스 (압축본)</h2>
+<p>패키지 전체(<code>setup.py</code>, <code>package.xml</code> 포함)를 압축한 워크스페이스는 아래에서 받을 수 있다.</p>
+<a class="download" href="https://github.com/csh5904/SWPilot_2026_Robotics_Team2/raw/main/csh5904/Chapter3/3-3/sw_ws.tar.gz">sw_ws.tar.gz 다운로드</a>
+
+</body>
+</html>
