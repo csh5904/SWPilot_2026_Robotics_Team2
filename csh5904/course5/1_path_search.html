@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>오일러 경로(Euler Path) 탐색</title>
+<style>
+  :root {
+    --bg: #fbfaf8;
+    --paper: #ffffff;
+    --ink: #24211d;
+    --muted: #6b665e;
+    --accent: #8a5a3d;
+    --accent-soft: #f1e6dc;
+    --line: #e6e0d6;
+    --code-bg: #2c2a26;
+    --code-ink: #eae5db;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Pretendard", "Apple SD Gothic Neo", "Noto Sans KR", -apple-system, BlinkMacSystemFont, sans-serif;
+    line-height: 1.75;
+  }
+  .wrap {
+    max-width: 820px;
+    margin: 0 auto;
+    padding: 56px 28px 96px;
+  }
+  header.title-block {
+    margin-bottom: 48px;
+    padding-bottom: 24px;
+    border-bottom: 2px solid var(--ink);
+  }
+  header.title-block h1 {
+    font-size: 2rem;
+    margin: 0 0 8px;
+    letter-spacing: -0.01em;
+  }
+  header.title-block p {
+    margin: 0;
+    color: var(--muted);
+    font-size: 0.95rem;
+  }
+  h2 {
+    font-size: 1.35rem;
+    margin-top: 3em;
+    margin-bottom: 0.8em;
+    padding-bottom: 0.4em;
+    border-bottom: 1px solid var(--line);
+  }
+  h3 {
+    font-size: 1.05rem;
+    color: var(--accent);
+    margin-top: 1.8em;
+  }
+  p { margin: 0.9em 0; }
+  ul, ol { padding-left: 1.4em; }
+  li { margin: 0.4em 0; }
+  strong { color: var(--ink); }
+  code {
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    background: var(--accent-soft);
+    padding: 0.15em 0.4em;
+    border-radius: 4px;
+    font-size: 0.88em;
+  }
+  pre {
+    background: var(--code-bg);
+    color: var(--code-ink);
+    padding: 20px 22px;
+    border-radius: 10px;
+    overflow-x: auto;
+    font-size: 0.85rem;
+    line-height: 1.6;
+    margin: 1.2em 0;
+  }
+  pre code {
+    background: none;
+    padding: 0;
+    color: inherit;
+  }
+  .callout {
+    background: var(--accent-soft);
+    border-left: 3px solid var(--accent);
+    padding: 14px 18px;
+    border-radius: 0 8px 8px 0;
+    margin: 1.2em 0;
+    font-size: 0.95rem;
+  }
+  .result-block {
+    background: var(--code-bg);
+    color: var(--code-ink);
+    border-radius: 10px;
+    padding: 20px 22px;
+    font-family: "SFMono-Regular", Consolas, monospace;
+    font-size: 0.88rem;
+    white-space: pre-wrap;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1.2em 0;
+    font-size: 0.92rem;
+  }
+  th, td {
+    text-align: left;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--line);
+  }
+  th {
+    color: var(--muted);
+    font-weight: 600;
+  }
+  footer {
+    margin-top: 64px;
+    padding-top: 20px;
+    border-top: 1px solid var(--line);
+    color: var(--muted);
+    font-size: 0.85rem;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="title-block">
+  <h1>오일러 경로(Euler Path) 탐색</h1>
+  <p>그래프 자료구조 · 오일러 서킷 · Hierholzer 알고리즘 기반 구현</p>
+</header>
+
+<section>
+<h2>1. 오일러 서킷(Euler Circuit)의 개념</h2>
+<p><strong>오일러 경로(Euler Path)</strong>는 그래프의 한 정점에서 출발하여, 그래프에 존재하는 <strong>모든 간선을 정확히 한 번씩만</strong> 지나서 도착하는 경로를 말한다. 이때 출발점과 도착점이 같으면 <strong>오일러 서킷(Euler Circuit)</strong> 또는 오일러 회로라고 부른다.</p>
+<p>이 개념은 1736년 레온하르트 오일러(Leonhard Euler)가 &ldquo;쾨니히스베르크의 다리 문제&rdquo;를 풀면서 처음 제시되었다. 도시를 가로지르는 7개의 다리를 한 번씩만 건너서 원래 위치로 돌아올 수 있는가 하는 문제였는데, 오일러는 이를 그래프(정점과 간선)로 추상화하여 각 정점(땅 덩어리)에 연결된 간선(다리)의 개수, 즉 <strong>차수(degree)</strong>를 기준으로 답할 수 있음을 증명했다.</p>
+
+<h3>오일러 경로/서킷의 존재 조건</h3>
+<p>무방향 그래프에서 다음 두 조건으로 판별한다.</p>
+<ol>
+  <li><strong>연결성</strong>: 간선을 가진 모든 정점은 하나의 연결 요소로 이어져 있어야 한다. (고립된 정점은 무시)</li>
+  <li><strong>차수 조건</strong>
+    <table>
+      <tr><th>홀수 차수 정점 개수</th><th>결과</th></tr>
+      <tr><td>0개</td><td>오일러 <strong>서킷</strong> 존재 (임의의 정점에서 출발 가능)</td></tr>
+      <tr><td>정확히 2개</td><td>오일러 <strong>경로</strong> 존재 (두 홀수 차수 정점 중 하나에서 출발 &rarr; 다른 하나에서 종료)</td></tr>
+      <tr><td>3개 이상</td><td>오일러 경로/서킷 모두 존재하지 않음</td></tr>
+    </table>
+  </li>
+</ol>
+<div class="callout">이번 과제의 그래프는 &ldquo;홀수 차수 정점이 두 개&rdquo;인 경우, 즉 반오일러 그래프(semi-Eulerian graph)에 해당한다.</div>
+</section>
+
+<section>
+<h2>2. 그래프 자료구조</h2>
+<p>그래프(Graph)는 <strong>정점(Vertex, Node)</strong>의 집합과 정점들을 연결하는 <strong>간선(Edge)</strong>의 집합으로 이루어진 자료구조로, 객체 간의 관계나 연결 상태를 표현하는 데 사용된다.</p>
+
+<h3>주요 표현 방식</h3>
+<ul>
+  <li><strong>인접 행렬(Adjacency Matrix)</strong>: <code>V x V</code> 크기의 2차원 배열로, 간선 존재 여부를 <code>O(1)</code>에 확인할 수 있지만 희소 그래프에서는 공간 낭비가 크다.</li>
+  <li><strong>인접 리스트(Adjacency List)</strong>: 각 정점마다 연결된 정점들의 목록을 저장한다. 공간 효율이 좋아 DFS/BFS 등 그래프 탐색에 널리 쓰인다.</li>
+</ul>
+
+<p>이번 과제의 <code>graph</code> 변수는 <strong>딕셔너리 기반 인접 리스트</strong>로 구현되어 있다.</p>
+
+<pre><code>graph = {
+    1: [2, 3],
+    2: [1, 3, 4],
+    3: [1, 2, 5],
+    4: [2, 5],
+    5: [3, 4]
+}</code></pre>
+
+<p>각 정점의 차수(리스트 길이)를 세어 보면 <code>1</code>&rarr;2, <code>2</code>&rarr;3, <code>3</code>&rarr;3, <code>4</code>&rarr;2, <code>5</code>&rarr;2로, 차수가 홀수인 정점은 <code>2</code>와 <code>3</code>뿐이다. 따라서 이 그래프는 정점 <code>2</code>와 <code>3</code> 중 하나에서 출발해 다른 하나에서 끝나는 오일러 경로를 가진다.</p>
+</section>
+
+<section>
+<h2>3. 알고리즘 학습: DFS 기반 간선 제거 방식</h2>
+<p>모든 간선을 한 번씩 방문하는 대표적인 알고리즘으로 <strong>Hierholzer 알고리즘</strong>이 있다. 기본 아이디어는 다음과 같다.</p>
+<ol>
+  <li>시작 정점에서 더 이상 갈 수 있는 간선이 없을 때까지 인접한 간선을 따라가며, 지나간 간선은 그래프에서 제거한다(양방향이므로 양쪽 인접 리스트에서 모두 제거).</li>
+  <li>간선을 따라 이동하는 과정에서 아직 방문하지 않은 정점을 만나면 그 정점으로 재귀적으로 들어간다.</li>
+  <li>더 이상 나갈 간선이 없는 정점에 도달하면 재귀를 빠져나오며, 원래 정점으로 돌아와 남은 간선이 있으면 다시 탐색을 이어간다.</li>
+  <li>모든 간선이 소진될 때까지 이 과정을 반복한다.</li>
+</ol>
+<p>정식 Hierholzer 알고리즘은 막다른 지점에서 되돌아 나올 때 방문 순서를 스택에 쌓았다가 마지막에 뒤집어(post-order) 완전한 오일러 회로/경로를 구성한다. 이번 과제에서는 그래프가 비교적 단순하고, &ldquo;경로 상에서 만나는 꼭짓점&rdquo;만 순서대로 반환하면 되므로, <strong>정점을 처음 만나는 시점에 바로 기록하는 방식(pre-order)</strong>으로도 목적을 달성할 수 있다.</p>
+<div class="callout">
+  간선을 하나씩 제거하며 진행하므로 같은 간선을 두 번 지나가지 않는다. 이미 방문한 정점으로 되돌아가는 간선은 소비(제거)만 되고 목록에는 중복 기록되지 않는다. 모든 간선이 제거되어야 탐색이 끝나므로, 오일러 경로 조건을 만족하는 그래프라면 함수 종료 시 모든 간선이 정확히 한 번씩 소비된 상태가 된다.
+</div>
+</section>
+
+<section>
+<h2>4. 구현</h2>
+<pre><code>import copy
+graph = {
+    1: [2, 3],
+    2: [1, 3, 4],
+    3: [1, 2, 5],
+    4: [2, 5],
+    5: [3, 4]
+}
+visted=[]
+def dfs(graph, start, visited):
+    visited.append(start)
+    while graph[start]:
+        neighbor = graph[start][0]
+        graph[start].remove(neighbor)
+        graph[neighbor].remove(start)
+        if neighbor not in visited:
+            dfs(graph, neighbor, visited)
+    return visited
+
+print(dfs(copy.deepcopy(graph),2,visted))</code></pre>
+</section>
+
+<section>
+<h2>5. 실행 결과</h2>
+<div class="result-block">[2, 1, 3, 5, 4]</div>
+<p>주어진 <code>graph</code>(정점 5개, 간선 6개, 홀수 차수 정점 2, 3)에서 정점 <code>2</code>를 출발점으로 삼으면 모든 간선을 한 번씩 소진하며 <code>[2, 1, 3, 5, 4]</code> 순서로 정점을 만난다.</p>
+</section>
+
+<footer>
+  참고 자료: Leonhard Euler, &ldquo;Solutio problematis ad geometriam situs pertinentis&rdquo; (1736) &middot; CLRS, <em>Introduction to Algorithms</em> &middot; Hierholzer, C. (1873)
+</footer>
+
+</div>
+</body>
+</html>
